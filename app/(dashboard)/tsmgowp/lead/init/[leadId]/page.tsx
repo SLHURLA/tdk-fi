@@ -19,12 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
-import {
-  type Lead,
-  WorkType,
-  AreaType,
-  AdditionalItemsList,
-} from "@prisma/client";
+import { type Lead, AreaType, AdditionalItemsList } from "@prisma/client";
 import {
   Table,
   TableBody,
@@ -106,9 +101,6 @@ const InitLead: React.FC = () => {
 
   const [providedItems, setProvidedItems] = useState<ProvidedItem[]>([]);
   const [additionalItems, setAdditionalItems] = useState<AdditionalItem[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<WorkType | null>(
-    null
-  );
   const [selectedAreaType, setSelectedAreaType] = useState<AreaType | null>(
     null
   );
