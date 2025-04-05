@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           Int             @id @default(autoincrement())
+  fullName     String?
+  otp          String?
+  empNo        String          @unique
+  username     String          @unique
+  email        String          @unique
+  mobileNo     String          @unique
+  passwordHash String
+  store        String?
+  role         Role
+  status       UserStatus      @default(ACTIVE)
+  leads        Lead[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  Notification Notification[]
+  storeExp     StoreExpNotes[]
+  revenue      Revenue[]
+}
+
+model Lead {
+  id                   Int               @id @default(autoincrement())
+  lead_id              String?
+  store                String
+  customerName         String
+  phoneNo              String
+  contactInfo          String
+  handoverDate         DateTime?
+  expectedHandoverDate DateTime?
+  init                 Boolean           @default(false)
+  status               LeadStatus        @default(WON)
+  userId               Int
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  user                 User              @relation(fields: [userId], references: [id])
+  totalProjectCost     Float             @default(0)
+  payInCash            Float             @default(0)
+  payInOnline          Float             @default(0)
+  receiveCash          Float             @default(0)
+  receiveOnline        Float             @default(0)
+  totalExp             Float             @default(0)
+  additionalItemsCost  Float             @default(0)
+  totalGST             Float             @default(0)
+  transactions         TransactionNote[]
+  additionalItems      AdditionalItems[]
+  ProvidedItems        ProvidedItems[]
+  vendors              Vendor[]
+}
+
+model AdditionalItems {
+  id           Int                 @id @default(autoincrement())
+  category     AdditionalItemsList
+  prodName     String
+  custPrice    Float
+  landingPrice Float?
+  model        String?
+  make         String?
+  leadId       Int
+  lead         Lead                @relation(fields: [leadId], references: [id])
+  gst          Float               @default(0)
+}
+
+model ProvidedItems {
+  id          Int      @id @default(autoincrement())
+  area        AreaType
+  brand       String?
+  model       String?
+  remark      String?
+  payInCash   Float    @default(0)
+  payInOnline Float    @default(0)
+  gst         Float    @default(0)
+  leadId      Int
+  lead        Lead     @relation(fields: [leadId], references: [id])
+}
+
+model StoreExpNotes {
+  id              Int             @id @default(autoincrement())
+  amount          Float
+  transactionName TransactionName
+  paymentMethod   PaymentMethod
+  transactionDate DateTime        @default(now())
+  date            DateTime        @default(now())
+  userId          Int
+  remark          String?
+  user            User            @relation(fields: [userId], references: [id])
+}
+
+model TransactionNote {
+  id              Int             @id @default(autoincrement())
+  amount          Float
+  transactionName TransactionName
+  transactionType TransactionType
+  paymentMethod   PaymentMethod
+  remark          String?
+  actualDate      DateTime        @default(now())
+  transactionDate DateTime        @default(now())
+  leadId          Int
+  lead            Lead            @relation(fields: [leadId], references: [id])
+  vendorId        Int?
+  vendor          Vendor?         @relation(fields: [vendorId], references: [id])
+}
+
+model Revenue {
+  id           Int      @id @default(autoincrement())
+  month        String
+  year         String
+  totalProfit  Float    @default(0)
+  projectClose Int      @default(0)
+  createdAt    DateTime @default(now())
+  revenue      Int      @default(0)
+  User         User?    @relation(fields: [userId], references: [id])
+  userId       Int?
+}
+
+model Notification {
+  notiId    Int      @id @default(autoincrement())
+  type      String
+  message   String
+  createdAt DateTime @default(now())
+  read      Boolean  @default(false)
+  User      User?    @relation(fields: [userId], references: [empNo])
+  userId    String?
+}
+
+model Vendor {
+  id               Int               @id @default(autoincrement())
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  name             String
+  mobileNo         String
+  address          String?
+  city             String?
+  TotalCharge      Float
+  GivenCharge      Float
+  leads            Lead[]
+  transNotes       TransactionNote[]
+  vendorsBreakdown VendorBreakdown[]
+}
+
+model VendorBreakdown {
+  id         Int      @id @default(autoincrement())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  leadId     Int
+  vendorId   Int
+  vendor     Vendor?  @relation(fields: [vendorId], references: [id])
+  totalAmt   Float
+  totalGiven Float
+}
+
+enum AreaType {
+  Kitchen
+  Utility
+  Store
+  Pantry
+  Vanity
+  TV_Panel
+  Wardrobe
+  Dressing
+  Other
+  Counter_top
+  Appliances
+  Sink
+  Installation
+}
+
+enum WorkType {
+  Cabinate
+  Hardware
+  Finish
+}
+
+enum Role {
+  ADMIN
+  SUPER_HEAD
+  STORE_MANAGER
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+}
+
+enum LeadStatus {
+  WON
+  INPROGRESS
+  CLOSED
+}
+
+enum PaymentMethod {
+  CASH
+  ONLINE
+}
+
+enum TransactionName {
+  SALARY
+  BANK_DDN
+  CASH_DDN
+  LABOUR
+  PANTRY
+  TRAVEL
+  FOOD
+  GIFT
+  FINISHING
+  MAINTENANCE
+  STATIONERY
+  RENT
+  ELECTRICITY
+  VENDOR_PAYMENT
+  MISCELLANEOUS
+  CLIENT_PAYMENT
+}
+
+enum AdditionalItemsList {
+  Counter_top
+  Appliances
+  Sink
+  Installation
+  Other
+}
+
+enum TransactionType {
+  CASH_IN
+  CASH_OUT
+}
