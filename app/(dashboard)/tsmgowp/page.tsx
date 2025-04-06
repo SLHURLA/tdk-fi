@@ -95,7 +95,7 @@ interface FinYearData {
 
 // Format numbers with commas for better readability
 const formatNumber = (num: number): string => {
-  return num.toLocaleString("en-IN");
+  return num?.toLocaleString("en-IN");
 };
 
 const fetcher = async (url: string): Promise<any> => {
@@ -392,7 +392,7 @@ export default function Dashboard() {
       const previousMonthData = revenueData.find(
         (item) =>
           item.month ===
-          `${previousMonth.toLocaleString("default", {
+          `${previousMonth?.toLocaleString("default", {
             month: "long",
           })}-${previousMonth.getFullYear()}`
       );
