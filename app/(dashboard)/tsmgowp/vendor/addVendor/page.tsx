@@ -23,6 +23,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useSession } from "next-auth/react";
+import { useEffect } from "react";
 
 const cities = [
   "Dehradun",
@@ -54,6 +55,7 @@ const AddVendor = () => {
   const router = useRouter();
   const { toast } = useToast();
   const { data: session } = useSession();
+  const isStoreManager = session?.user?.role === "STORE_MANAGER";
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -61,9 +63,16 @@ const AddVendor = () => {
       name: "",
       address: "",
       mobileNo: "",
-      city: session?.user?.role === "STORE_MANAGER" ? session.user.store : "", // Pre-fill city for STORE_MANAGER
+      city: isStoreManager ? session?.user?.store || "" : "",
     },
   });
+
+  // Ensure the city value is properly set for store managers
+  useEffect(() => {
+    if (isStoreManager && session?.user?.store) {
+      form.setValue("city", session.user.store);
+    }
+  }, [session, form, isStoreManager]);
 
   const onSubmit = async (values: z.infer<typeof FormSchema>) => {
     const response = await fetch("/api/addVendor", {
@@ -132,7 +141,7 @@ const AddVendor = () => {
                     <FormLabel>Mobile No.</FormLabel>
                     <FormControl>
                       <Input
-                        type="text" // Changed to text to avoid number input issues
+                        type="text"
                         placeholder="Mobile No."
                         {...field}
                         onChange={(e) => {
@@ -156,15 +165,16 @@ const AddVendor = () => {
                   <FormItem className="w-[50%]">
                     <FormLabel>City</FormLabel>
                     <FormControl>
-                      {session?.user?.role === "STORE_MANAGER" ? (
-                        // Uneditable input for STORE_MANAGER
+                      {isStoreManager ? (
+                        // Make sure the field value is properly connected to the form for store managers
                         <Input
-                          value={session.user.store}
+                          {...field}
+                          value={session?.user?.store || ""}
                           readOnly
-                          className="cursor-not-allowed"
+                          className="cursor-not-allowed bg-gray-100"
                         />
                       ) : (
-                        // Editable dropdown for other roles
+                        // Dropdown for other roles
                         <Select
                           onValueChange={field.onChange}
                           value={field.value}

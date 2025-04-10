@@ -99,7 +99,9 @@ const StoreExpenses = () => {
   const isMobile = useIsMobile();
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
-  const [currentStoreName, setCurrentStoreName] = useState<string>("");
+  const [currentStoreName, setCurrentStoreName] = useState<string>(
+    session?.user?.store || ""
+  );
 
   // Calculate the start and end dates of the current month
   const currentDate = new Date();
@@ -156,7 +158,7 @@ const StoreExpenses = () => {
       const currentStoreInfo = storesData.find(
         (store: Store) => store.userId === userId?.toString()
       );
-
+      console.log(currentStoreInfo);
       if (currentStoreInfo) {
         setCurrentStoreName(currentStoreInfo.store);
       } else if (selectedStore) {
@@ -706,6 +708,10 @@ const AddExpenseForm = ({
                 <SelectItem value="STATIONERY">Stationery</SelectItem>
                 <SelectItem value="RENT">Rent</SelectItem>
                 <SelectItem value="ELECTRICITY">Electricity</SelectItem>
+                <SelectItem value="MOBILE_RECHARGE">Mobile Recharge</SelectItem>
+                <SelectItem value="LOCAL_FREIGHT">Local Freight</SelectItem>
+                <SelectItem value="TRANSPORTATION">Transportation</SelectItem>
+                <SelectItem value="PETROL">Petrol</SelectItem>
                 <SelectItem value="MISCELLANEOUS">Miscellaneous</SelectItem>
               </SelectContent>
             </Select>
