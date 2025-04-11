@@ -23,7 +23,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useSession } from "next-auth/react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const cities = [
   "Dehradun",
@@ -52,6 +52,7 @@ const FormSchema = z.object({
 });
 
 const AddVendor = () => {
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
   const { data: session } = useSession();
@@ -75,19 +76,26 @@ const AddVendor = () => {
   }, [session, form, isStoreManager]);
 
   const onSubmit = async (values: z.infer<typeof FormSchema>) => {
-    const response = await fetch("/api/addVendor", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(values),
-    });
+    setLoading(true);
+    try {
+      const response = await fetch("/api/addVendor", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+      });
 
-    if (response.ok) {
-      toast({ description: "Vendor Added Successfully" });
-      router.push("/tsmgowp/vendor/dashboard");
-    } else {
-      toast({ description: "Failed to create vendor" });
+      if (response.ok) {
+        toast({ description: "Vendor Added Successfully" });
+        router.push("/tsmgowp/vendor/dashboard");
+      } else {
+        toast({ description: "Failed to create vendor" });
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -145,7 +153,7 @@ const AddVendor = () => {
                         placeholder="Mobile No."
                         {...field}
                         onChange={(e) => {
-                          const value = e.target.value.replace(/\D/g, ""); // Allow only digits
+                          const value = e.target.value.replace(/\D/g, "");
                           field.onChange(value);
                         }}
                       />
@@ -200,7 +208,7 @@ const AddVendor = () => {
 
             {/* Submit Button */}
             <div className="flex justify-center">
-              <Button className="w-[50%]" type="submit">
+              <Button disabled={loading} className="w-[50%]" type="submit">
                 Add Vendor
               </Button>
             </div>

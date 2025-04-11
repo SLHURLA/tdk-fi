@@ -92,7 +92,9 @@ export async function POST(
       where: { id: lead.id },
       data: {
         receiveCash:
-          transactionType === "CASH_IN" && paymentMethod === "CASH"
+          transactionType === "CASH_IN" &&
+          paymentMethod === "CASH" &&
+          transactionName !== "VENDOR_PAYMENT"
             ? lead.receiveCash + amount
             : transactionType === "CASH_OUT" &&
               paymentMethod === "CASH" &&
@@ -101,7 +103,9 @@ export async function POST(
             : lead.receiveCash,
 
         receiveOnline:
-          transactionType === "CASH_IN" && paymentMethod === "ONLINE"
+          transactionType === "CASH_IN" &&
+          paymentMethod === "ONLINE" &&
+          transactionName !== "VENDOR_PAYMENT"
             ? lead.receiveOnline + amount
             : transactionType === "CASH_OUT" &&
               paymentMethod === "ONLINE" &&
@@ -150,7 +154,10 @@ export async function POST(
       updatedVendor = await db.vendor.update({
         where: { id: vendor.id },
         data: {
-          GivenCharge: vendor.GivenCharge + amount,
+          GivenCharge:
+            transactionType === "CASH_OUT"
+              ? vendor.GivenCharge + amount
+              : vendor.GivenCharge - amount,
         },
       });
 
@@ -166,7 +173,7 @@ export async function POST(
         },
         data: {
           totalGiven: {
-            increment: amount,
+            increment: transactionType === "CASH_OUT" ? amount : -amount,
           },
         },
       });
