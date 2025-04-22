@@ -123,24 +123,39 @@ const Vendors: React.FC<VendorsProps> = ({
     );
 
     // Calculate cash payments (CASH_OUT only)
-    const cashPayments = relevantTransactions
+    const cashIn = relevantTransactions
       .filter(
         (note) =>
-          // note.transactionType === "CASH_OUT" &&
-          note.paymentMethod === "CASH"
+          note.transactionType === "CASH_IN" && note.paymentMethod === "CASH"
       )
       .reduce((sum, note) => sum + note.amount, 0);
 
-    // Calculate bank/online payments (CASH_OUT only)
-    const bankPayments = relevantTransactions
+    const cashOut = relevantTransactions
       .filter(
         (note) =>
-          // note.transactionType === "CASH_OUT" &&
-          note.paymentMethod === "ONLINE"
+          note.transactionType === "CASH_OUT" && note.paymentMethod === "CASH"
       )
       .reduce((sum, note) => sum + note.amount, 0);
 
-    return { cashPayments, bankPayments };
+    const netCash = cashIn - cashOut;
+
+    const bankIn = relevantTransactions
+      .filter(
+        (note) =>
+          note.transactionType === "CASH_IN" && note.paymentMethod === "ONLINE"
+      )
+      .reduce((sum, note) => sum + note.amount, 0);
+
+    const bankOut = relevantTransactions
+      .filter(
+        (note) =>
+          note.transactionType === "CASH_OUT" && note.paymentMethod === "ONLINE"
+      )
+      .reduce((sum, note) => sum + note.amount, 0);
+
+    const netBank = bankIn - bankOut;
+
+    return { netCash, netBank };
   };
 
   const onSubmit = async () => {
@@ -385,17 +400,17 @@ const Vendors: React.FC<VendorsProps> = ({
                 vendor?.vendorsBreakdown[0]?.totalGiven;
 
               // Calculate cash and bank payments
-              const { cashPayments, bankPayments } = calculatePayments(vendor);
+              const { netCash, netBank } = calculatePayments(vendor);
 
               return (
                 <TableRow key={vendor.id}>
                   <TableCell className="p-4">{vendor.id}</TableCell>
                   <TableCell className="p-4">{vendor.name}</TableCell>
                   <TableCell className="p-4">
-                    ₹{cashPayments.toLocaleString()}
+                    ₹{netCash?.toLocaleString()}
                   </TableCell>
                   <TableCell className="p-4">
-                    ₹{bankPayments.toLocaleString()}
+                    ₹{netBank.toLocaleString()}
                   </TableCell>
                   <TableCell className="p-4 flex items-center">
                     ₹{vendor?.vendorsBreakdown[0]?.totalAmt.toLocaleString()}

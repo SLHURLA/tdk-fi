@@ -116,6 +116,9 @@ export async function POST(
         totalExp:
           transactionType === "CASH_OUT" && transactionName !== "CLIENT_PAYMENT"
             ? lead.totalExp + amount
+            : transactionType === "CASH_IN" &&
+              transactionName === "VENDOR_PAYMENT"
+            ? lead.totalExp - amount
             : lead.totalExp,
       },
     });
