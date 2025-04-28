@@ -22,6 +22,7 @@ const transactionSchema = z.object({
     "MISCELLANEOUS",
     "VENDOR_PAYMENT",
     "CLIENT_PAYMENT",
+    "ROUNDOFF",
   ]),
   transactionType: z.enum(["CASH_IN", "CASH_OUT"]),
   paymentMethod: z.enum(["ONLINE", "CASH"]),

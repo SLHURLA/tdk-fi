@@ -17,7 +17,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
+import {Button} from "@/components/ui/button"
 interface FinancialSummaryProps {
   totalProjectCost: number;
   totalPaid: number;
@@ -26,6 +26,8 @@ interface FinancialSummaryProps {
   recievedCash: number;
   recievedOnline: number;
   additionalItemsCost: number;
+  onPayCash?: () => void;
+  onPayBank?: () => void;
 }
 
 const FinancialSummary = ({
@@ -36,6 +38,8 @@ const FinancialSummary = ({
   recievedCash,
   recievedOnline,
   additionalItemsCost,
+  onPayBank,
+  onPayCash,
 }: FinancialSummaryProps) => {
   // Calculate remaining amount
   const remainingAmount = totalProjectCost - totalPaid;
@@ -152,6 +156,27 @@ const FinancialSummary = ({
               <ArrowDownIcon className="mr-1 h-4 w-4" />
               <span>{formatCurrency(remainingAmount)} outstanding</span>
             </div>
+
+             {remainingAmount > 0 && (
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant="outline"
+                className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
+                onClick={onPayCash}
+              >
+                <BanknoteIcon className="mr-2 h-4 w-4" />
+                Pay Cash
+              </Button>
+              <Button
+                variant="outline"
+                className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300"
+                onClick={onPayBank}
+              >
+                <CreditCard className="mr-2 h-4 w-4" />
+                Pay Bank
+              </Button>
+            </div>
+          )}
           </CardContent>
         </Card>
       </div>

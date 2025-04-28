@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       "Anupam Sink",
       "Morzze Sink",
       "Hafele Water Solution",
-      "Craysin Sink",
+      "Carysil Sink",
     ];
 
     const applianceBrands = [
@@ -41,6 +41,16 @@ export async function GET(req: NextRequest) {
       "Bosch Appliances",
       "Electrolux",
     ];
+
+    // Helper function to extract main brand name
+    const extractMainBrand = (
+      brandName: string,
+      suffixToRemove: string
+    ): string => {
+      // Create a case-insensitive regex to remove the suffix (if present)
+      const suffixRegex = new RegExp(`\\s*${suffixToRemove}\\s*`, "i");
+      return brandName.replace(suffixRegex, "").trim();
+    };
 
     let whereCondition: any = {};
 
@@ -54,59 +64,63 @@ export async function GET(req: NextRequest) {
             mode: "insensitive" as const,
           },
         }));
-      }
-      else if (normalizedItem === "counter_top") {
+      } else if (normalizedItem === "counter_top") {
         whereCondition.name = {
           contains: "Stone Vendor",
           mode: "insensitive" as const,
         };
-
+      } else if (normalizedItem === "sink") {
         if (brand) {
-          const normalizedBrand = brand.trim().toLowerCase();
+          // Extract the main brand name by removing "sink" if it exists
+          const mainBrandName = extractMainBrand(brand, "sink");
 
-          const matchedSinkBrand = sinkBrands.find((sb) =>
-            normalizedBrand.includes(sb.toLowerCase())
-          );
+          // Search for vendors with the main brand name
+          whereCondition.name = {
+            contains: mainBrandName,
+            mode: "insensitive" as const,
+          };
+        } else {
+          // If no brand specified, search for vendors with any sink brand's main name
+          whereCondition.OR = sinkBrands.map((sinkBrand) => {
+            // Extract the main part of the brand name (without "Sink")
+            const mainBrandName = extractMainBrand(sinkBrand, "sink");
 
-          if (matchedSinkBrand) {
-            whereCondition.brand = {
-              contains: matchedSinkBrand,
-              mode: "insensitive" as const,
-            };
-          }
-        }
-      }
-      else if (normalizedItem === "appliances") {
-        if (brand) {
-          const normalizedBrand = brand.trim().toLowerCase();
-
-          const matchedApplianceBrand = applianceBrands.find((ab) =>
-            normalizedBrand.includes(ab.toLowerCase())
-          );
-
-          if (matchedApplianceBrand) {
-            whereCondition.brand = {
-              contains: matchedApplianceBrand,
-              mode: "insensitive" as const,
-            };
-          } else {
-            whereCondition.OR = applianceBrands.map((brand) => ({
-              brand: {
-                contains: brand,
+            return {
+              name: {
+                contains: mainBrandName,
                 mode: "insensitive" as const,
               },
-            }));
-          }
-        } else {
-          whereCondition.OR = applianceBrands.map((brand) => ({
-            brand: {
-              contains: brand,
-              mode: "insensitive" as const,
-            },
-          }));
+            };
+          });
         }
-      }
-      else {
+      } else if (normalizedItem === "appliances") {
+        if (brand) {
+          // Extract the main brand name by removing "appliances" if it exists
+          const mainBrandName = extractMainBrand(brand, "appliances");
+
+          // Search for vendors with the main brand name
+          whereCondition.name = {
+            contains: mainBrandName,
+            mode: "insensitive" as const,
+          };
+        } else {
+          // If no brand specified, search for vendors with any appliance brand's main name
+          whereCondition.OR = applianceBrands.map((applianceBrand) => {
+            // Extract the main part of the brand name (without "Appliances")
+            const mainBrandName = extractMainBrand(
+              applianceBrand,
+              "appliances"
+            );
+
+            return {
+              name: {
+                contains: mainBrandName,
+                mode: "insensitive" as const,
+              },
+            };
+          });
+        }
+      } else {
         whereCondition.items = {
           some: {
             name: {
@@ -117,11 +131,20 @@ export async function GET(req: NextRequest) {
         };
       }
     } else if (brand) {
-      whereCondition.brand = {
-        contains: brand,
+      // When only brand is provided (no item), try to match the main brand name
+      // This handles both sink brands and appliance brands
+      const mainBrandName = brand
+        .replace(/\s*sink\s*/i, "")
+        .replace(/\s*appliances\s*/i, "")
+        .trim();
+
+      whereCondition.name = {
+        contains: mainBrandName,
         mode: "insensitive" as const,
       };
     }
+
+    console.log("whereCondition:", JSON.stringify(whereCondition, null, 2));
 
     const data = await db.vendor.findMany({
       where: whereCondition,
@@ -131,6 +154,7 @@ export async function GET(req: NextRequest) {
         city: true,
       },
     });
+    console.log("data received:", data);
 
     console.log(`Found ${data.length} matching vendors`);
 

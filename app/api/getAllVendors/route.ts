@@ -14,6 +14,8 @@ export async function GET(request: NextRequest) {
         transNotes: true,
       },
     });
+
+    console.log("vendors", vendors);
     return NextResponse.json({ vendors, message: "success" }, { status: 201 });
   } catch (error) {
     console.error("Error fetching leads:", error);

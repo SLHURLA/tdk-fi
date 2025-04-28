@@ -59,6 +59,7 @@ interface ProvidedItem {
   brand: string;
   model: string;
   remark: string;
+  vendors?: Array<{ id: string; name: string; city: string }>;
 }
 
 interface AdditionalItem {
@@ -229,6 +230,28 @@ const InitLead: React.FC = () => {
     calculateOverallGST(providedItems, additionalItems);
   }, [providedItems, additionalItems]);
 
+  const [assignedVendors, setAssignedVendors] = useState<
+    Array<{ id: string; name: string; city: string }>
+  >([]);
+
+  const handleVendorAssign = (vendor: any) => {
+    if (!assignedVendors.some((v) => v.id === vendor.id)) {
+      setAssignedVendors([...assignedVendors, vendor]);
+      toast({
+        title: "Vendor Assigned",
+        description: `${vendor.name} has been assigned to this item.`,
+      });
+    }
+  };
+
+  const handleVendorRemove = (vendorId: string) => {
+    setAssignedVendors(assignedVendors.filter((v) => v.id !== vendorId));
+    toast({
+      title: "Vendor Removed",
+      description: "Vendor has been removed from this item.",
+    });
+  };
+
   if (isLoading || !data) {
     return (
       <div className="flex flex-col items-center justify-center w-full h-[60vh]">
@@ -315,15 +338,6 @@ const InitLead: React.FC = () => {
       return;
     }
 
-    // if ((payInCash || 0) + (payInOnline || 0) <= 0) {
-    //   toast({
-    //     variant: "destructive",
-    //     title: "Payment Required",
-    //     description: "Please enter at least one payment method amount.",
-    //   });
-    //   return;
-    // }
-
     if (totalProjectCost <= 0) {
       toast({
         variant: "destructive",
@@ -337,6 +351,51 @@ const InitLead: React.FC = () => {
     setIsSubmitting(true);
 
     try {
+      // First, assign all vendors to the lead
+      // Collect all vendors from all provided items
+      const allVendors: any[] = [];
+      for (const item of providedItems) {
+        if (item.vendors && item.vendors.length > 0) {
+          for (const vendor of item.vendors) {
+            // Avoid duplicates by checking if vendor is already in allVendors
+            if (!allVendors.some((v) => v.id === vendor.id)) {
+              allVendors.push(vendor);
+            }
+          }
+        }
+      }
+
+      // Assign all collected vendors to the lead
+      if (allVendors.length > 0) {
+        try {
+          for (const vendor of allVendors) {
+            await fetch("/api/addVendorToLead", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                vendorId: Number(vendor.id),
+                leadId: Number(leadId),
+                price: 0, // Initial price set to 0
+              }),
+            });
+          }
+
+          toast({
+            title: "Vendors Assigned",
+            description: `${allVendors.length} vendor(s) assigned to the lead.`,
+          });
+        } catch (error) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to assign vendors to the lead.",
+          });
+          console.error("Error assigning vendors:", error);
+          setIsSubmitting(false);
+          return; // Exit if vendor assignment fails
+        }
+      }
+
       // Map the providedItems to match the new schema before sending
       const mappedProvidedItems = providedItems.map((item) => ({
         area: item.area as AreaType,
@@ -364,10 +423,6 @@ const InitLead: React.FC = () => {
       const requestData: LeadData = {
         status: "INPROGRESS",
         userId: data?.userId,
-        // totalProjectCost:
-        //   (payInCash || 0) + (payInOnline || 0) + additionalItemsPrice,
-        // payInCash: payInCash,
-        // payInOnline: payInOnline,
         expectedHandoverDate: expectedHandoverDate,
         additionalItems: mappedAdditionalItems || [],
         providedItems: mappedProvidedItems || [],
@@ -530,6 +585,7 @@ const InitLead: React.FC = () => {
                         <TableHead className="p-4">Brand</TableHead>
                         <TableHead className="p-4">Model</TableHead>
                         <TableHead className="p-4">Remark</TableHead>
+                        <TableHead className="p-4">Assigned Vendors</TableHead>
                         <TableHead className="text-right p-4">Action</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -561,6 +617,24 @@ const InitLead: React.FC = () => {
                             {item.model || "-"}
                           </TableCell>
                           <TableCell>{item.remark || "-"}</TableCell>
+                          <TableCell className="p-4">
+                            {item.vendors && item.vendors.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {item.vendors.map((vendor) => (
+                                  <Badge
+                                    key={vendor.id}
+                                    variant="outline"
+                                    className="text-xs"
+                                  >
+                                    {vendor.name}{" "}
+                                    {vendor.city && `(${vendor.city})`}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              "-"
+                            )}
+                          </TableCell>
                           <TableCell className="text-right p-4">
                             <Button
                               variant="ghost"
@@ -1008,6 +1082,7 @@ import {
 } from "@/components/ui/select";
 
 import { toast } from "@/hooks/use-toast";
+import VendorSelection from "@/components/Lead/VendorAssignment";
 const BookItemSection: React.FC<BookItemSectionProps> = ({
   providedItems,
   setProvidedItems,
@@ -1022,6 +1097,9 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
   const [brand, setBrand] = useState<string>("");
   const [model, setModel] = useState<string>("");
   const [remark, setRemark] = useState<string>("");
+  const [assignedVendors, setAssignedVendors] = useState<
+    Array<{ id: string; name: string; city: string }>
+  >([]);
   const [lastEditedGstField, setLastEditedGstField] = useState<
     "percentage" | "amount" | null
   >(null);
@@ -1038,6 +1116,26 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
   // Get current particulars based on active tab
   const currentParticulars =
     activeTab === "main" ? mainParticulars : additionalParticulars;
+
+  // Handle vendor assignment
+  const handleVendorAssign = (vendor: any) => {
+    if (!assignedVendors.some((v) => v.id === vendor.id)) {
+      setAssignedVendors([...assignedVendors, vendor]);
+      toast({
+        title: "Vendor Assigned",
+        description: `${vendor.name} has been assigned to this item.`,
+      });
+    }
+  };
+
+  // Handle vendor removal
+  const handleVendorRemove = (vendorId: string) => {
+    setAssignedVendors(assignedVendors.filter((v) => v.id !== vendorId));
+    toast({
+      title: "Vendor Removed",
+      description: "Vendor has been removed from this item.",
+    });
+  };
 
   // Calculate GST when percentage or amount changes
   useEffect(() => {
@@ -1193,6 +1291,8 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
       brand: brand || "",
       model: model || "",
       remark: remark || "",
+      // Add vendor information (this would need to be added to the ProvidedItem interface)
+      vendors: assignedVendors,
     };
 
     setProvidedItems([...providedItems, newItem]);
@@ -1215,6 +1315,7 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
     setBrand("");
     setModel("");
     setRemark("");
+    setAssignedVendors([]);
     setLastEditedGstField(null);
   };
 
@@ -1328,26 +1429,26 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
             </div>
           </div>
 
-          {/* Brand and Model Inputs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="brand">Brand</Label>
-              <Input
-                id="brand"
-                placeholder="Enter brand name"
-                value={brand}
-                onChange={(e) => setBrand(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="model">Model</Label>
-              <Input
-                id="model"
-                placeholder="Enter model name"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-              />
-            </div>
+          {/* Vendor Selection Component */}
+          <VendorSelection
+            activeTab={activeTab}
+            areaType={areaType}
+            brand={brand}
+            setBrand={setBrand}
+            onVendorAssign={handleVendorAssign}
+            assignedVendors={assignedVendors}
+            onVendorRemove={handleVendorRemove}
+          />
+
+          {/* Model Input */}
+          <div className="space-y-2">
+            <Label htmlFor="model">Model</Label>
+            <Input
+              id="model"
+              placeholder="Enter model name"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+            />
           </div>
 
           {/* Remark Input */}
