@@ -27,6 +27,7 @@ interface VendorWithBreakdown extends VendorType {
   vendorsBreakdown: VendorBreakdown[];
 }
 import { Vendor as VendorType, VendorBreakdown } from "@prisma/client";
+import RoundOff from "@/components/Lead/RoundOff";
 async function fetcher(url: string) {
   const response = await fetch(`/api/${url}`);
 
@@ -313,6 +314,7 @@ const SingleLead = () => {
           </Button>
         </div>
         <div className="flex items-center gap-4">
+          <RoundOff leadId={Array.isArray(leadId) ? leadId[0] : leadId || ""} />
           {data.status !== "CLOSED" && (
             <Button onClick={handleProjectHandOver}>Handover Project</Button>
           )}
