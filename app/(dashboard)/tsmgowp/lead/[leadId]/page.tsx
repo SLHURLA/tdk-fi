@@ -23,7 +23,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-
+interface VendorWithBreakdown extends VendorType {
+  vendorsBreakdown: VendorBreakdown[];
+}
+import { Vendor as VendorType, VendorBreakdown } from "@prisma/client";
 async function fetcher(url: string) {
   const response = await fetch(`/api/${url}`);
 
@@ -59,6 +62,10 @@ const SingleLead = () => {
   const [prefilledAmount, setPrefilledAmount] = useState<number | undefined>(
     undefined
   );
+
+  const [paymentMethod, setPaymentMethod] = useState<
+    "ONLINE" | "CASH" | undefined
+  >(undefined);
   const transactionRef = useRef<HTMLDivElement>(null);
   const closedLead = data?.status === "CLOSED" || false;
 
@@ -124,6 +131,28 @@ const SingleLead = () => {
       return;
     }
 
+    const hasIncompleteVendorPayments = data.vendors.some(
+      (vendor: VendorWithBreakdown) => {
+        // Check each vendor's breakdown
+        return vendor.vendorsBreakdown.some((breakdown: VendorBreakdown) => {
+          // If totalAmt > totalGiven, payment is incomplete
+          return breakdown.totalAmt > breakdown.totalGiven;
+        });
+      }
+    );
+
+    console.log("HASINCOMPLETEPAYMENTS", hasIncompleteVendorPayments);
+
+    if (hasIncompleteVendorPayments) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description:
+          "Cannot hand over project with incomplete vendor payments.",
+      });
+      return;
+    }
+
     if (!data || !data.id || !leadId || !session?.user?.id) {
       toast({
         variant: "destructive",
@@ -169,6 +198,50 @@ const SingleLead = () => {
     } finally {
       setIsHandingOver(false);
     }
+  };
+  // In the SingleLead component, update the handlers with a paymentMethod parameter
+  const handlePayCash = () => {
+    // Calculate remaining amount
+    const remainingAmount = data.payInCash - data.receiveCash;
+
+    // Set values for cash payment
+    setSelectedVendorId(undefined);
+    setPrefilledAmount(remainingAmount);
+
+    // Add this state variable to track payment method
+    setPaymentMethod("CASH");
+
+    // Scroll to transaction form
+    setTimeout(() => {
+      if (transactionRef.current) {
+        transactionRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }, 100);
+  };
+
+  const handlePayBank = () => {
+    // Calculate remaining amount
+    const remainingAmount = data.payInOnline - data.receiveOnline;
+
+    // Set values for bank payment
+    setSelectedVendorId(undefined);
+    setPrefilledAmount(remainingAmount);
+
+    // Add this state variable to track payment method
+    setPaymentMethod("ONLINE");
+
+    // Scroll to transaction form
+    setTimeout(() => {
+      if (transactionRef.current) {
+        transactionRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }, 100);
   };
 
   console.log("CUSTOMER DATA", data);
@@ -255,6 +328,8 @@ const SingleLead = () => {
           recievedCash={data.receiveCash}
           recievedOnline={data.receiveOnline}
           additionalItemsCost={data.additionalItemsCost}
+          onPayCash={handlePayCash}
+          onPayBank={handlePayBank}
         />
       </div>
       <div className="mt-2">
@@ -273,6 +348,7 @@ const SingleLead = () => {
             id={data.id}
             prefilledVendorId={selectedVendorId}
             prefilledAmount={prefilledAmount}
+            prefilledPaymentMethod={paymentMethod} // Add this new prop
             onDataUpdate={mutate}
           />
         </div>

@@ -121,6 +121,7 @@ interface AddTransactionNoteProps {
   id: number;
   prefilledVendorId?: number;
   prefilledAmount?: number;
+  prefilledPaymentMethod?: "ONLINE" | "CASH";
   ref?: React.ForwardedRef<HTMLDivElement>;
   onDataUpdate: () => void;
 }
@@ -135,6 +136,7 @@ const AddTransactionNote: React.FC<AddTransactionNoteProps> = React.forwardRef(
       id,
       prefilledVendorId,
       prefilledAmount,
+      prefilledPaymentMethod,
       onDataUpdate,
     },
     ref
@@ -204,16 +206,25 @@ const AddTransactionNote: React.FC<AddTransactionNoteProps> = React.forwardRef(
     // Apply prefilled values when they change
     useEffect(() => {
       if (prefilledVendorId) {
+        // For vendor payments
         setValue("partyType", "VENDOR");
         setValue("flowType", "OUT");
         setValue("vendorId", prefilledVendorId);
+        setValue("paymentMethod", prefilledPaymentMethod || "CASH");
         setIsPrefilled(true);
 
         if (prefilledAmount) {
           setValue("amount", prefilledAmount);
         }
+      } else if (prefilledAmount !== undefined) {
+        // For client payments (cash or bank)
+        setValue("partyType", "CLIENT");
+        setValue("flowType", "IN");
+        setValue("amount", prefilledAmount);
+        setValue("paymentMethod", prefilledPaymentMethod || "CASH");
+        setIsPrefilled(true);
       }
-    }, [prefilledVendorId, prefilledAmount, setValue]);
+    }, [prefilledVendorId, prefilledAmount, prefilledPaymentMethod, setValue]);
 
     useEffect(() => {
       // Move this inside the effect to avoid dependency issues
