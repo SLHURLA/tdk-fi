@@ -223,6 +223,7 @@ enum TransactionName {
   LOCAL_FREIGHT
   TRANSPORTATION
   PETROL
+  ROUNDOFF
 }
 
 enum AdditionalItemsList {
