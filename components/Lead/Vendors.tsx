@@ -407,10 +407,10 @@ const Vendors: React.FC<VendorsProps> = ({
                   <TableCell className="p-4">{vendor.id}</TableCell>
                   <TableCell className="p-4">{vendor.name}</TableCell>
                   <TableCell className="p-4">
-                    ₹{netCash?.toLocaleString()}
+                    ₹{Math.abs(netCash)?.toLocaleString()}
                   </TableCell>
                   <TableCell className="p-4">
-                    ₹{netBank.toLocaleString()}
+                    ₹{Math.abs(netBank).toLocaleString()}
                   </TableCell>
                   <TableCell className="p-4 flex items-center">
                     ₹{vendor?.vendorsBreakdown[0]?.totalAmt.toLocaleString()}
@@ -428,7 +428,7 @@ const Vendors: React.FC<VendorsProps> = ({
                     ₹{vendor?.vendorsBreakdown[0]?.totalGiven.toLocaleString()}
                   </TableCell>
                   <TableCell className="p-4">
-                    ₹{remainingCharge.toLocaleString()}
+                    ₹{Math.abs(remainingCharge).toLocaleString()}
                   </TableCell>
                   <TableCell className="p-4">
                     <div className="flex gap-2">
