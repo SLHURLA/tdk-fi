@@ -364,19 +364,22 @@ const InitLead: React.FC = () => {
           }
         }
       }
-
+      console.log("ALLVENDORS", allVendors);
       // Assign all collected vendors to the lead
       if (allVendors.length > 0) {
         try {
           for (const vendor of allVendors) {
+            const requestData = {
+              vendorId: Number(vendor.id),
+              leadId: leadId,
+              price: 0,
+            };
+            console.log("Sending vendor assignment request:", requestData);
+
             await fetch("/api/addVendorToLead", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                vendorId: Number(vendor.id),
-                leadId: Number(leadId),
-                price: 0, // Initial price set to 0
-              }),
+              body: JSON.stringify(requestData),
             });
           }
 
