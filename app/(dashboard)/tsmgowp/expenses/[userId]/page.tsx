@@ -28,8 +28,14 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { useParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import useSWR from "swr";
-import { CalendarIcon, Download } from "lucide-react";
+import useSWR, { mutate } from "swr";
+import {
+  CalendarIcon,
+  DeleteIcon,
+  Download,
+  Trash,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -75,7 +81,6 @@ const fetcher = async (url: string) => {
     method: "GET",
     headers: { "Content-Type": "application/json" },
   });
-
   if (!response.ok) throw new Error("Failed to fetch data");
 
   const data = await response.json();
@@ -134,6 +139,7 @@ const StoreExpenses = () => {
       : `/api/getStoreExp?userId=${userId}`,
     fetcher
   );
+  console.log(expensesData);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   // Modify the date range selection logic to auto-close the popover
@@ -461,6 +467,39 @@ const StoreExpenses = () => {
     }
   };
 
+  const deleteData = async (id: string) => {
+    try {
+      const response = await fetch("/api/deleteExp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id }),
+      });
+
+      mutate(
+        selectedStore
+          ? `/api/getStoreExp?userId=${selectedStore}`
+          : `/api/getStoreExp?userId=${userId}`
+      );
+
+      toast({
+        title: "Expense Deleted",
+        description: "Your expense has been successfully deleted.",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("Delete successful:", result);
+      return result;
+    } catch (error) {
+      console.error("Failed to delete:", error);
+    }
+  };
+
   return (
     <Card className="mt-8 w-full">
       <CardHeader>
@@ -600,6 +639,7 @@ const StoreExpenses = () => {
               <TableHead className="p-4">Amount</TableHead>
               <TableHead className="p-4">Payment Method</TableHead>
               <TableHead className="p-4">Remark</TableHead>
+              <TableHead className="p-4">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -640,6 +680,12 @@ const StoreExpenses = () => {
                   <Badge variant="secondary">{expense.paymentMethod}</Badge>
                 </TableCell>
                 <TableCell className="p-4">{expense.remark || "-"}</TableCell>
+                <TableCell
+                  onClick={() => deleteData(expense?.id)}
+                  className="p-4 cursor-pointer"
+                >
+                  {<Trash2 size={20} color="red" />}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
