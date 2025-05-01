@@ -65,6 +65,15 @@ interface RevenueData {
   revenue: number;
   totalProfit: number;
   projectClose: number;
+  totalProjects?: number;
+  totalVendorPayments?: number;
+  totalExpenses?: number;
+  cash?: number;
+  online?: number;
+  receiveCash?: number;
+  receiveOnline?: number;
+  payInCash?: number;
+  payInOnline?: number;
 }
 
 interface CompanyData {
@@ -83,7 +92,13 @@ interface StoreData {
   revenue: number;
   totalProfit: number;
   projectClose: number;
-  projectsLive?: number; // Optional if not always present
+  projectsLive?: number;
+  cash?: number;
+  online?: number;
+  receiveCash?: number;
+  receiveOnline?: number;
+  payInCash?: number;
+  payInOnline?: number;
 }
 
 interface FinYearData {
@@ -91,6 +106,15 @@ interface FinYearData {
   totalProfit: number;
   revenue: number;
   projectClose: number;
+  totalProjects?: number;
+  totalVendorPayments?: number;
+  totalExpenses?: number;
+  cash?: number;
+  online?: number;
+  receiveCash?: number;
+  receiveOnline?: number;
+  payInCash?: number;
+  payInOnline?: number;
 }
 
 // Format numbers with commas for better readability
@@ -114,16 +138,36 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState<string>("January");
   const [selectedQuarter, setSelectedQuarter] = useState<string>("1");
   const [selectedFinYear, setSelectedFinYear] = useState<string>("2024-2025");
+  const [activeTab, setActiveTab] = useState<string>("handover");
   const { data: session } = useSession();
 
   // Using static data instead of fetching from API
-  const url =
+  const handoverUrl =
     session?.user.role === "STORE_MANAGER"
       ? `/api/getStoreRevenue/${session?.user.id}`
       : "/api/getAllRevenue";
-  const { data, isLoading, error } = useSWR(url, fetcher);
-  console.log("Full API response:", data);
-  console.log(session?.user?.role, data);
+  const {
+    data: handoverData,
+    isLoading: handoverLoading,
+    error: handoverError,
+  } = useSWR(handoverUrl, fetcher);
+
+  const ongoingUrl =
+    session?.user.role === "STORE_MANAGER"
+      ? `/api/ongoingStoreDashboard/${session?.user.id}`
+      : "/api/ongoingProjDashboard";
+  const {
+    data: ongoingData,
+    isLoading: ongoingLoading,
+    error: ongoingError,
+  } = useSWR(ongoingUrl, fetcher);
+
+  console.log("data", handoverData, ongoingData);
+
+  // Determine which data to use based on active tab
+  const data = activeTab === "handover" ? handoverData : ongoingData;
+  const isLoading = activeTab === "handover" ? handoverLoading : ongoingLoading;
+  const error = activeTab === "handover" ? handoverError : ongoingError;
 
   const transformData = (
     data: any,
@@ -132,7 +176,7 @@ export default function Dashboard() {
     revenueData: RevenueData[];
     userStoreWiseRevenue: Record<string, StoreData>;
     finYearData: FinYearData[];
-    storeData: any[]; // Add this to handle the new storeData structure
+    storeData: any[];
   } => {
     if (!data) {
       return {
@@ -147,23 +191,41 @@ export default function Dashboard() {
     if (isStoreManager) {
       const storeRevenueData =
         data.monthWiseRevenue?.map((item: any) => ({
-          month: item.monthYear,
+          month: item.monthYear || item.month,
           revenue: item.revenue,
           totalProfit: item.totalProfit,
           projectClose: item.projectClose,
+          totalProjects: item.totalProjects || 0,
+          totalVendorPayments: item.totalVendorPayments ?? 0, // Use nullish coalescing
+          totalExpenses: item.totalExpenses || 0,
+          cash: item.cash || 0,
+          online: item.online || 0,
+          receiveCash: item.receiveCash || 0,
+          receiveOnline: item.receiveOnline || 0,
+          payInCash: item.payInCash || 0,
+          payInOnline: item.payInOnline || 0,
         })) || [];
 
       return {
         revenueData: storeRevenueData,
-        userStoreWiseRevenue: {}, // Empty since store manager only sees their store
+        userStoreWiseRevenue: {},
         finYearData:
           data.finYearWiseRevenue?.map((item: any) => ({
             finYear: item.finYear,
             totalProfit: item.totalProfit,
             revenue: item.revenue,
             projectClose: item.projectClose,
+            totalProjects: item.totalProjects || 0,
+            totalVendorPayments: item.totalVendorPayments ?? 0, // Use nullish coalescing
+            totalExpenses: item.totalExpenses || 0,
+            cash: item.cash || 0,
+            online: item.online || 0,
+            receiveCash: item.receiveCash || 0,
+            receiveOnline: item.receiveOnline || 0,
+            payInCash: item.payInCash || 0,
+            payInOnline: item.payInOnline || 0,
           })) || [],
-        storeData: [], // Empty for store manager
+        storeData: [],
       };
     }
 
@@ -174,6 +236,15 @@ export default function Dashboard() {
         totalProfit: item.totalProfit,
         revenue: item.revenue,
         projectClose: item.projectClose,
+        totalProjects: item.totalProjects || 0,
+        totalVendorPayments: item.totalVendorPayments ?? 0, // Use nullish coalescing
+        totalExpenses: item.totalExpenses || 0,
+        cash: item.cash || 0,
+        online: item.online || 0,
+        receiveCash: item.receiveCash || 0,
+        receiveOnline: item.receiveOnline || 0,
+        payInCash: item.payInCash || 0,
+        payInOnline: item.payInOnline || 0,
       })) || [];
 
     const userStoreWiseRevenue =
@@ -186,6 +257,12 @@ export default function Dashboard() {
             revenue: item.revenue,
             totalProfit: item.totalProfit,
             projectClose: item.projectClose,
+            cash: item.cash,
+            online: item.online,
+            receiveCash: item.receiveCash,
+            receiveOnline: item.receiveOnline,
+            payInCash: item.payInCash,
+            payInOnline: item.payInOnline,
           };
           return acc;
         },
@@ -196,9 +273,10 @@ export default function Dashboard() {
       revenueData: data.monthWiseRevenue || [],
       userStoreWiseRevenue,
       finYearData,
-      storeData: data.storeData || [], // Add the storeData from the response
+      storeData: data.storeData || [],
     };
   };
+
   const isStoreManager = session?.user.role === "STORE_MANAGER";
   const { revenueData, finYearData, userStoreWiseRevenue, storeData } = data
     ? transformData(data, isStoreManager)
@@ -211,8 +289,14 @@ export default function Dashboard() {
 
   // Get unique years from data
   const years = Array.from(
-    new Set(revenueData.map((item) => item.month?.split("-")[1]))
-  ).filter(Boolean);
+    new Set(
+      revenueData
+        .map(
+          (item) => item.month?.split("-")[1] || item.monthYear?.split("-")[1]
+        )
+        .filter(Boolean)
+    )
+  );
 
   // Get unique financial years from data
   const finYears = Array.from(
@@ -223,15 +307,21 @@ export default function Dashboard() {
   const getFilteredData = (): RevenueData[] => {
     switch (timeframe) {
       case "yearly":
-        return revenueData.filter((item) => item.month?.endsWith(selectedYear));
+        return revenueData.filter((item) => {
+          const monthYear = item.month || item.monthYear;
+          return monthYear?.endsWith(selectedYear);
+        });
       case "monthly":
         return revenueData.filter(
-          (item) => item.month === `${selectedMonth}-${selectedYear}`
+          (item) =>
+            (item.month || item.monthYear) ===
+            `${selectedMonth}-${selectedYear}`
         );
       case "quarterly":
         return revenueData.filter((item) => {
-          const month = item.month?.split("-")[0];
-          const year = item.month?.split("-")[1];
+          const monthYear = item.month || item.monthYear;
+          const month = monthYear?.split("-")[0];
+          const year = monthYear?.split("-")[1];
           if (!month || !year) return false;
 
           const monthNum = new Date(`${month} 1, ${year}`).getMonth();
@@ -239,127 +329,96 @@ export default function Dashboard() {
           return quarter === parseInt(selectedQuarter) && year === selectedYear;
         });
       case "financial":
-        // Add filtered data for financial year
         return revenueData.filter((item) => {
-          const month = item.month?.split("-")[0];
-          const year = item.month?.split("-")[1];
+          const monthYear = item.month || item.monthYear;
+          const month = monthYear?.split("-")[0];
+          const year = monthYear?.split("-")[1];
           if (!month || !year) return false;
 
-          // Assuming financial year format is "YYYY-YYYY"
           const [startYear, endYear] = selectedFinYear.split("-");
-
-          // Simple check - if month is before April, it belongs to the previous year's financial year
           const monthNum = new Date(`${month} 1, ${year}`).getMonth();
-          if (monthNum < 3 && year === endYear) return true; // Jan-Mar of end year
-          if (monthNum >= 3 && year === startYear) return true; // Apr-Dec of start year
-
+          if (monthNum < 3 && year === endYear) return true;
+          if (monthNum >= 3 && year === startYear) return true;
           return false;
         });
       default:
         return revenueData;
     }
   };
+
   const getFilteredStoreData = (storeName: string): any => {
+    if (!storeData || !Array.isArray(storeData)) return null;
+
     const store = storeData.find((s) => s.store === storeName);
     if (!store) return null;
+
+    // Initialize fallback data structure with all possible fields
+    const fallbackData = {
+      revenue: 0,
+      totalProfit: 0,
+      projectClose: 0,
+      totalProjects: 0,
+      totalVendorPayments: 0,
+      totalExpenses: 0,
+      cash: 0,
+      online: 0,
+      receiveCash: 0,
+      receiveOnline: 0,
+      payInCash: 0,
+      payInOnline: 0,
+      year: selectedYear ? parseInt(selectedYear) : new Date().getFullYear(),
+      month: selectedMonth || "",
+      quarter: selectedQuarter ? parseInt(selectedQuarter) : 1,
+      finYear: selectedFinYear || "",
+    };
+
+    // Get the correct data source
+    const dataSource = store;
 
     switch (timeframe) {
       case "yearly":
         return (
-          store.yearly.find((y: any) => y.year.toString() === selectedYear) || {
-            year: parseInt(selectedYear),
-            revenue: 0,
-            totalProfit: 0,
-            projectClose: 0,
-          }
+          dataSource.yearly?.find(
+            (y: any) => y.year?.toString() === selectedYear
+          ) || fallbackData
         );
       case "monthly":
+        // Handle both "March" and "March-2025" formats
+        const monthKey = selectedMonth.includes("-")
+          ? selectedMonth
+          : `${selectedMonth}-${selectedYear}`;
         return (
-          store.monthly.find(
+          dataSource.monthly?.find(
             (m: any) =>
-              m.month === selectedMonth && m.year.toString() === selectedYear
-          ) || {
-            month: selectedMonth,
-            year: parseInt(selectedYear),
-            revenue: 0,
-            totalProfit: 0,
-            projectClose: 0,
-          }
+              (m.month === selectedMonth || m.month === monthKey) &&
+              (m.year?.toString() === selectedYear || !m.year)
+          ) || fallbackData
         );
       case "quarterly":
-        // First check if we have explicit quarterly data that matches the selected quarter
-        const quarterData = store.quarterly?.find(
-          (q: any) =>
-            q.quarter?.toString() === selectedQuarter &&
-            q.year?.toString() === selectedYear
+        // Handle both "Q1" and "Q1-2025" formats
+        const quarterKey = selectedQuarter.includes("-")
+          ? selectedQuarter
+          : `Q${selectedQuarter}-${selectedYear}`;
+        return (
+          dataSource.quarterly?.find(
+            (q: any) =>
+              (q.quarter?.toString() === selectedQuarter ||
+                q.quarter?.toString().startsWith(`Q${selectedQuarter}`)) &&
+              (q.year?.toString() === selectedYear || !q.year)
+          ) || fallbackData
         );
-
-        // If we have explicit data that matches the selected quarter, return it
-        if (quarterData && quarterData.quarter === parseInt(selectedQuarter)) {
-          return quarterData;
-        }
-
-        // Otherwise calculate from monthly data
-        const quarterMonths =
-          store.monthly?.filter((m: any) => {
-            const monthNum = new Date(`${m.month} 1, ${m.year}`).getMonth() + 1;
-            const quarter = Math.ceil(monthNum / 3);
-            return (
-              quarter === parseInt(selectedQuarter) &&
-              m.year.toString() === selectedYear
-            );
-          }) || [];
-
-        // If we have months in this quarter, sum them up
-        if (quarterMonths.length > 0) {
-          return {
-            totalProfit: quarterMonths.reduce(
-              (sum: number, m: any) => sum + m.totalProfit,
-              0
-            ),
-            revenue: quarterMonths.reduce(
-              (sum: number, m: any) => sum + m.revenue,
-              0
-            ),
-            projectClose: quarterMonths.reduce(
-              (sum: number, m: any) => sum + m.projectClose,
-              0
-            ),
-            quarter: parseInt(selectedQuarter),
-            year: parseInt(selectedYear),
-          };
-        }
-
-        // Return zero values if no data exists for this quarter
-        return {
-          quarter: parseInt(selectedQuarter),
-          year: parseInt(selectedYear),
-          revenue: 0,
-          totalProfit: 0,
-          projectClose: 0,
-        };
       case "financial":
         return (
-          store.financialYear?.find(
+          dataSource.financialYear?.find(
             (fy: any) => fy.finYear === selectedFinYear
-          ) || {
-            finYear: selectedFinYear,
-            revenue: 0,
-            totalProfit: 0,
-            projectClose: 0,
-          }
+          ) || fallbackData
         );
       default:
-        return {
-          revenue: 0,
-          totalProfit: 0,
-          projectClose: 0,
-        };
+        return fallbackData;
     }
   };
+
   const filteredData = getFilteredData();
-  // const filteredStoreData = getFilteredStoreData();
-  // Get financial year data for the selected financial year
   const getSelectedFinYearData = (): FinYearData | null => {
     return finYearData.find((item) => item.finYear === selectedFinYear) || null;
   };
@@ -376,9 +435,10 @@ export default function Dashboard() {
   // Get previous year/month data
   const getPreviousData = (): { revenue: number; totalProfit: number } => {
     if (timeframe === "yearly") {
-      const previousYearData = revenueData.filter((item) =>
-        item.month?.endsWith(String(parseInt(selectedYear) - 1))
-      );
+      const previousYearData = revenueData.filter((item) => {
+        const monthYear = item.month || item.monthYear;
+        return monthYear?.endsWith(String(parseInt(selectedYear) - 1));
+      });
       return previousYearData.reduce(
         (acc, item) => ({
           revenue: acc.revenue + item.revenue,
@@ -391,7 +451,7 @@ export default function Dashboard() {
       previousMonth.setMonth(previousMonth.getMonth() - 1);
       const previousMonthData = revenueData.find(
         (item) =>
-          item.month ===
+          (item.month || item.monthYear) ===
           `${previousMonth?.toLocaleString("default", {
             month: "long",
           })}-${previousMonth.getFullYear()}`
@@ -406,8 +466,9 @@ export default function Dashboard() {
           : parseInt(selectedYear) - 1;
 
       const prevQuarterData = revenueData.filter((item) => {
-        const month = item.month?.split("-")[0];
-        const year = item.month?.split("-")[1];
+        const monthYear = item.month || item.monthYear;
+        const month = monthYear?.split("-")[0];
+        const year = monthYear?.split("-")[1];
         if (!month || !year) return false;
 
         const monthNum = new Date(`${month} 1, ${year}`).getMonth();
@@ -423,7 +484,6 @@ export default function Dashboard() {
         { revenue: 0, totalProfit: 0 }
       );
     } else if (timeframe === "financial") {
-      // For financial year, get the previous financial year data
       const [startYear, endYear] = selectedFinYear.split("-");
       const prevFinYear = `${parseInt(startYear) - 1}-${parseInt(endYear) - 1}`;
 
@@ -432,7 +492,10 @@ export default function Dashboard() {
       );
 
       return prevFinYearData
-        ? { revenue: 0, totalProfit: prevFinYearData.totalProfit }
+        ? {
+            revenue: prevFinYearData.revenue,
+            totalProfit: prevFinYearData.totalProfit,
+          }
         : { revenue: 0, totalProfit: 0 };
     }
     return { revenue: 0, totalProfit: 0 };
@@ -447,7 +510,6 @@ export default function Dashboard() {
   if (isLoading) return <div className="p-8 text-center">Loading data...</div>;
   if (error) return <div className="p-8 text-center">Error loading data</div>;
   if (!data) return <div className="p-8 text-center">No data available</div>;
-
   return (
     <div>
       <div className="flex min-h-screen bg-background">
@@ -592,15 +654,28 @@ export default function Dashboard() {
           </header>
 
           <main className="grid gap-6 p-6 md:gap-8 md:p-8">
+            {/* Tabs for Handover and Ongoing Projects */}
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="handover">Handover Projects</TabsTrigger>
+                <TabsTrigger value="ongoing">Ongoing Projects</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
             <section>
               <div className="mb-6">
-                <h2 className="text-2xl font-bold">Company Profit Overview</h2>
+                <h2 className="text-2xl font-bold">
+                  {activeTab === "handover" ? "Handover" : "Ongoing"} Project
+                  Overview
+                </h2>
                 <p className="text-muted-foreground">
                   Comprehensive view of company-wide performance metrics
                 </p>
               </div>
-              {/* Top metrics */}
+
+              {/* Top metrics - modified for tab-specific display */}
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                {/* Total Revenue - shown in both tabs */}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium">
@@ -648,6 +723,8 @@ export default function Dashboard() {
                     </p>
                   </CardContent>
                 </Card>
+
+                {/* Total Profit - shown in both tabs */}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium">
@@ -697,47 +774,169 @@ export default function Dashboard() {
                     </p>
                   </CardContent>
                 </Card>
+
+                {/* Projects Closed/Live - shown in both tabs with conditional title */}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium">
-                      Projects Closed
+                      {activeTab === "handover"
+                        ? "Projects Closed"
+                        : "Projects Live"}
                     </CardTitle>
                     <Package className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
                       {timeframe === "financial"
-                        ? selectedFinYearData?.projectClose || 0 // Show only selected financial year's projects
+                        ? selectedFinYearData?.projectClose ||
+                          (activeTab === "ongoing"
+                            ? selectedFinYearData?.totalProjects || 0
+                            : 0)
                         : filteredData.reduce(
-                            (acc, item) => acc + item.projectClose,
+                            (acc, item) =>
+                              acc +
+                              (activeTab === "handover"
+                                ? item.projectClose
+                                : item.totalProjects || 0),
                             0
                           )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Successfully completed projects
+                      {activeTab === "handover"
+                        ? "Successfully completed projects"
+                        : "Currently active projects"}
                     </p>
                   </CardContent>
                 </Card>
-                {timeframe === "financial" && (
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Vendor Payments
+                    </CardTitle>
+                    <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      ₹
+                      {formatNumber(
+                        timeframe === "financial"
+                          ? selectedFinYearData?.totalVendorPayments || 0
+                          : filteredData.reduce(
+                              (acc, item) =>
+                                acc + (item.totalVendorPayments || 0),
+                              0
+                            )
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Total payments to vendors
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Payment methods - only shown in ongoing tab */}
+              {activeTab === "ongoing" && (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-6">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-medium">
-                        Financial Year
+                        Pay in Cash
                       </CardTitle>
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
-                        {selectedFinYear}
+                        ₹
+                        {formatNumber(
+                          timeframe === "financial"
+                            ? selectedFinYearData?.payInCash || 0
+                            : filteredData.reduce(
+                                (acc, item) => acc + (item.payInCash || 0),
+                                0
+                              )
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        April {selectedFinYear.split("-")[0]} - March{" "}
-                        {selectedFinYear.split("-")[1]}
+                        Total cash payments
                       </p>
                     </CardContent>
                   </Card>
-                )}
-              </div>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Pay Online
+                      </CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        ₹
+                        {formatNumber(
+                          timeframe === "financial"
+                            ? selectedFinYearData?.payInOnline || 0
+                            : filteredData.reduce(
+                                (acc, item) => acc + (item.payInOnline || 0),
+                                0
+                              )
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total online payments
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Receive in Cash
+                      </CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        ₹
+                        {formatNumber(
+                          timeframe === "financial"
+                            ? selectedFinYearData?.receiveCash || 0
+                            : filteredData.reduce(
+                                (acc, item) => acc + (item.receiveCash || 0),
+                                0
+                              )
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total cash receipts
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Receive Online
+                      </CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        ₹
+                        {formatNumber(
+                          timeframe === "financial"
+                            ? selectedFinYearData?.receiveOnline || 0
+                            : filteredData.reduce(
+                                (acc, item) => acc + (item.receiveOnline || 0),
+                                0
+                              )
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total online receipts
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
               {/* Financial Year Overview Card */}
               {timeframe === "financial" && selectedFinYear && (
                 <Card className="mt-4">
@@ -782,17 +981,48 @@ export default function Dashboard() {
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Projects Closed:</span>
+                        <span>
+                          Projects{" "}
+                          {activeTab === "handover" ? "Closed" : "Live"}:
+                        </span>
                         <span className="font-semibold">
                           {isStoreManager
-                            ? data.totalProjectClose
-                            : selectedFinYearData?.projectClose || 0}
+                            ? activeTab === "handover"
+                              ? data.totalProjectClose
+                              : data.totalProjects
+                            : activeTab === "handover"
+                            ? selectedFinYearData?.projectClose || 0
+                            : selectedFinYearData?.totalProjects || 0}
                         </span>
                       </div>
+                      {activeTab === "ongoing" && (
+                        <>
+                          <div className="flex justify-between">
+                            <span>Vendor Payments:</span>
+                            <span className="font-semibold">
+                              ₹
+                              {formatNumber(
+                                selectedFinYearData?.totalVendorPayments || 0
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Expenses:</span>
+                            <span className="font-semibold">
+                              ₹
+                              {formatNumber(
+                                selectedFinYearData?.totalExpenses || 0
+                              )}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
               )}
+
+              {/* Charts */}
               {/* Charts */}
               {timeframe !== "monthly" && timeframe !== "financial" && (
                 <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -803,8 +1033,6 @@ export default function Dashboard() {
                           ? "Yearly Revenue"
                           : timeframe === "quarterly"
                           ? "Quarterly Revenue"
-                          : timeframe === "financial"
-                          ? "Financial Year Revenue"
                           : "Revenue"}
                       </CardTitle>
                       <CardDescription>
@@ -823,8 +1051,6 @@ export default function Dashboard() {
                             ? "Yearly Profit"
                             : timeframe === "quarterly"
                             ? "Quarterly Profit"
-                            : timeframe === "financial"
-                            ? "Financial Year Profit"
                             : "Profit"}
                         </CardTitle>
                         <CardDescription>
@@ -841,6 +1067,7 @@ export default function Dashboard() {
                   )}
                 </div>
               )}
+
               {/* Financial Year Comparison */}
               {timeframe === "financial" && (
                 <Card className="mt-6">
@@ -856,6 +1083,7 @@ export default function Dashboard() {
                 </Card>
               )}
             </section>
+
             {!isStoreManager && (
               <section>
                 <div className="mb-6">
@@ -878,6 +1106,11 @@ export default function Dashboard() {
                     <TabsTrigger value="projects" className="flex-1">
                       Projects
                     </TabsTrigger>
+                    {activeTab === "ongoing" && (
+                      <TabsTrigger value="payments" className="flex-1">
+                        Payments
+                      </TabsTrigger>
+                    )}
                   </TabsList>
 
                   <TabsContent value="overview" className="mt-6">
@@ -944,13 +1177,34 @@ export default function Dashboard() {
                                     className="h-2 mt-2"
                                   />
                                 </div>
-                                <div className="flex justify-between pt-4">
+                                <div className="flex justify-between pt-4 flex-wrap gap-4">
+                                  <div>
+                                    <p className="text-sm font-medium">
+                                      Projects Live
+                                    </p>
+                                    <p className="text-sm font-bold">
+                                      {displayData.totalProjects || 0}
+                                    </p>
+                                  </div>
+
                                   <div>
                                     <p className="text-sm font-medium">
                                       Projects Closed
                                     </p>
-                                    <p className="text-2xl font-bold">
-                                      {displayData.projectClose}
+                                    <p className="text-sm font-bold">
+                                      {displayData.projectClose || 0}
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <p className="text-sm font-medium">
+                                      Vendor Payments
+                                    </p>
+                                    <p className="text-sm font-bold">
+                                      ₹
+                                      {formatNumber(
+                                        displayData.totalVendorPayments || 0
+                                      )}
                                     </p>
                                   </div>
                                 </div>
@@ -989,6 +1243,7 @@ export default function Dashboard() {
                               revenue: filteredData?.revenue || 0,
                               totalProfit: filteredData?.totalProfit || 0,
                               projectClose: filteredData?.projectClose || 0,
+                              totalProjects: filteredData?.totalProjects || 0,
                             };
                           })}
                           metric="revenue"
@@ -1002,7 +1257,10 @@ export default function Dashboard() {
                       <CardHeader>
                         <CardTitle>Store Projects Comparison</CardTitle>
                         <CardDescription>
-                          Projects closed by store (
+                          {activeTab === "handover"
+                            ? "Projects closed"
+                            : "Projects live"}{" "}
+                          by store (
                           {timeframe === "yearly"
                             ? `Year ${selectedYear}`
                             : timeframe === "monthly"
@@ -1023,13 +1281,54 @@ export default function Dashboard() {
                               store: store.store,
                               revenue: filteredData?.revenue || 0,
                               totalProfit: filteredData?.totalProfit || 0,
-                              projectClose: filteredData?.projectClose || 0,
+                              projectClose:
+                                activeTab === "handover"
+                                  ? filteredData?.projectClose || 0
+                                  : filteredData?.totalProjects || 0,
                             };
                           })}
+                          activeTab={activeTab}
                         />
                       </CardContent>
                     </Card>
                   </TabsContent>
+
+                  {activeTab === "ongoing" && (
+                    <TabsContent value="payments" className="mt-6">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Store Payments Comparison</CardTitle>
+                          <CardDescription>
+                            Payment methods by store (
+                            {timeframe === "yearly"
+                              ? `Year ${selectedYear}`
+                              : timeframe === "monthly"
+                              ? `${selectedMonth} ${selectedYear}`
+                              : timeframe === "quarterly"
+                              ? `Q${selectedQuarter} ${selectedYear}`
+                              : `FY ${selectedFinYear}`}
+                            )
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="px-2">
+                          <PaymentsComparisonChart
+                            data={storeData.map((store) => {
+                              const filteredData = getFilteredStoreData(
+                                store.store
+                              );
+                              return {
+                                store: store.store,
+                                payInCash: filteredData?.payInCash || 0,
+                                payInOnline: filteredData?.payInOnline || 0,
+                                receiveCash: filteredData?.receiveCash || 0,
+                                receiveOnline: filteredData?.receiveOnline || 0,
+                              };
+                            })}
+                          />
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  )}
                 </Tabs>
               </section>
             )}
@@ -1051,10 +1350,11 @@ function RevenueChart({ data, timeframe }: RevenueChartProps) {
   // Extract month names from the data
   const getMonthLabels = () => {
     return data.map((item) => {
-      if (!item.month) return "";
+      if (!item.month && !item.monthYear) return "";
 
       // For monthly data, the format is "Month-Year" (e.g., "January-2023")
-      const [month, year] = item.month.split("-");
+      const monthYear = item.month || item.monthYear;
+      const [month] = monthYear.split("-");
       return month;
     });
   };
@@ -1163,10 +1463,6 @@ function ProfitChart({ data, timeframe }: ProfitChartProps) {
   // Calculate maxProfit
   const maxProfit = Math.max(...data.map((item) => item.totalProfit));
 
-  // Log data and maxProfit for debugging
-  console.log("ProfitChart Data:", data);
-  console.log("Max Profit:", maxProfit);
-
   // Adjust bar width based on timeframe
   const barWidth = timeframe === "yearly" ? "w-8" : "w-16"; // Narrower bars for yearly view
 
@@ -1191,13 +1487,6 @@ function ProfitChart({ data, timeframe }: ProfitChartProps) {
               // Calculate bar height dynamically
               const barHeight = (item.totalProfit / maxProfit) * 150;
 
-              // Log bar height for debugging
-              console.log(
-                `Bar ${index + 1} - Profit: ${
-                  item.totalProfit
-                }, Height: ${barHeight}px`
-              );
-
               return (
                 <div
                   key={index}
@@ -1211,10 +1500,10 @@ function ProfitChart({ data, timeframe }: ProfitChartProps) {
                   />
                   <div className="text-xs font-medium mt-2">
                     {timeframe === "yearly"
-                      ? item.month?.split("-")[0] // Display month name for yearly view
+                      ? (item.month || item.monthYear)?.split("-")[0] // Display month name for yearly view
                       : timeframe === "quarterly"
-                      ? `${item.month}` // Display month for quarterly view
-                      : item.month}{" "}
+                      ? `${item.month || item.monthYear}` // Display month for quarterly view
+                      : item.month || item.monthYear}{" "}
                     {/* Display month for monthly view */}
                   </div>
                   <div className="text-xs text-muted-foreground">
@@ -1229,43 +1518,13 @@ function ProfitChart({ data, timeframe }: ProfitChartProps) {
     </div>
   );
 }
-// JavaScript for tooltip functionality
-function initTooltips() {
-  const revenueAreas = document.querySelectorAll("[data-revenue]");
-  const tooltip = document.getElementById("revenue-tooltip");
-  const tooltipPeriod = document.getElementById("tooltip-period");
-  const tooltipRevenue = document.getElementById("tooltip-revenue");
 
-  if (!tooltip || !tooltipPeriod || !tooltipRevenue) return;
-
-  revenueAreas.forEach((area) => {
-    area.addEventListener("mouseenter", (e) => {
-      const target = e.target as HTMLElement;
-      const revenue = target.getAttribute("data-revenue");
-      const period = target.getAttribute("data-period");
-
-      tooltipPeriod.textContent = period || "";
-      tooltipRevenue.textContent = "₹" + formatNumber(Number(revenue));
-
-      const rect = target.getBoundingClientRect();
-      const svgRect = target.closest("svg")?.getBoundingClientRect();
-
-      if (svgRect) {
-        const x = rect.left + rect.width / 2 - svgRect.left;
-        const y = rect.top - svgRect.top;
-
-        tooltip.style.left = `${x}px`;
-        tooltip.style.top = `${y}px`;
-        tooltip.classList.remove("hidden");
-      }
-    });
-
-    area.addEventListener("mouseleave", () => {
-      tooltip.classList.add("hidden");
-    });
-  });
+interface StoreComparisonChartProps {
+  data: any[];
+  metric: string;
 }
-function StoreComparisonChart({ data, metric }) {
+
+function StoreComparisonChart({ data, metric }: StoreComparisonChartProps) {
   const maxValue = Math.max(...data.map((item) => item[metric] || 0));
 
   return (
@@ -1309,7 +1568,15 @@ function StoreComparisonChart({ data, metric }) {
   );
 }
 
-function ProjectsComparisonChart({ data }) {
+interface ProjectsComparisonChartProps {
+  data: any[];
+  activeTab: string;
+}
+
+function ProjectsComparisonChart({
+  data,
+  activeTab,
+}: ProjectsComparisonChartProps) {
   const maxClosed = Math.max(...data.map((item) => item.projectClose || 0));
 
   return (
@@ -1318,7 +1585,9 @@ function ProjectsComparisonChart({ data }) {
         <div className="flex items-center gap-4 mb-4">
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded-full bg-primary"></div>
-            <span className="text-sm">Projects Closed</span>
+            <span className="text-sm">
+              {activeTab === "handover" ? "Projects Closed" : "Projects Live"}
+            </span>
           </div>
         </div>
         <div className="mt-4 h-[250px] w-full overflow-x-auto">
@@ -1338,7 +1607,11 @@ function ProjectsComparisonChart({ data }) {
                   </div>
                   <div className="text-xs font-medium">{item.store}</div>
                   <div className="text-xs text-muted-foreground">
-                    Closed: {item.projectClose || 0}
+                    {item.projectClose || 0}
+                  </div>
+                  {/* Add numerical value display */}
+                  <div className="text-xs font-semibold">
+                    {item.projectClose || 0} Projects
                   </div>
                 </div>
                 {index < data.length - 1 && (
@@ -1353,11 +1626,47 @@ function ProjectsComparisonChart({ data }) {
   );
 }
 
-const VerticalSeparator = () => (
-  <div className="w-px h-full border-l border-dashed border-border" />
-);
+interface PaymentsComparisonChartProps {
+  data: any[];
+}
 
-function FinancialYearComparisonChart({ data }: { data: FinYearData[] }) {
+function PaymentsComparisonChart({ data }: PaymentsComparisonChartProps) {
+  return (
+    <div className="h-auto">
+      <div className="flex flex-col gap-4">
+        {data.map((item, index) => (
+          <Card key={index}>
+            <CardHeader>
+              <CardTitle>{item.store}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h3 className="font-medium">Payments</h3>
+                  <div>Cash: ₹{formatNumber(item.payInCash || 0)}</div>
+                  <div>Online: ₹{formatNumber(item.payInOnline || 0)}</div>
+                </div>
+                <div>
+                  <h3 className="font-medium">Receipts</h3>
+                  <div>Cash: ₹{formatNumber(item.receiveCash || 0)}</div>
+                  <div>Online: ₹{formatNumber(item.receiveOnline || 0)}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface FinancialYearComparisonChartProps {
+  data: FinYearData[];
+}
+
+function FinancialYearComparisonChart({
+  data,
+}: FinancialYearComparisonChartProps) {
   // Sort financial years by profit in descending order
   const sortedData = [...data].sort((a, b) => b.totalProfit - a.totalProfit);
 
@@ -1403,4 +1712,41 @@ function FinancialYearComparisonChart({ data }: { data: FinYearData[] }) {
       </div>
     </div>
   );
+}
+
+// JavaScript for tooltip functionality
+function initTooltips() {
+  const revenueAreas = document.querySelectorAll("[data-revenue]");
+  const tooltip = document.getElementById("revenue-tooltip");
+  const tooltipPeriod = document.getElementById("tooltip-period");
+  const tooltipRevenue = document.getElementById("tooltip-revenue");
+
+  if (!tooltip || !tooltipPeriod || !tooltipRevenue) return;
+
+  revenueAreas.forEach((area) => {
+    area.addEventListener("mouseenter", (e) => {
+      const target = e.target as HTMLElement;
+      const revenue = target.getAttribute("data-revenue");
+      const period = target.getAttribute("data-period");
+
+      tooltipPeriod.textContent = period || "";
+      tooltipRevenue.textContent = "₹" + formatNumber(Number(revenue));
+
+      const rect = target.getBoundingClientRect();
+      const svgRect = target.closest("svg")?.getBoundingClientRect();
+
+      if (svgRect) {
+        const x = rect.left + rect.width / 2 - svgRect.left;
+        const y = rect.top - svgRect.top;
+
+        tooltip.style.left = `${x}px`;
+        tooltip.style.top = `${y}px`;
+        tooltip.classList.remove("hidden");
+      }
+    });
+
+    area.addEventListener("mouseleave", () => {
+      tooltip.classList.add("hidden");
+    });
+  });
 }
