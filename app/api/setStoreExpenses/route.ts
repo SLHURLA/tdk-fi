@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     const month = monthNames[today.getMonth()];
     const year = today.getFullYear().toString();
-
+    console.log("adding rev");
     //check rev of that month is present or not
     const rev = await db.revenue.findFirst({
       where: {

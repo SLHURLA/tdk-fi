@@ -17,14 +17,14 @@ export async function GET(request: NextRequest) {
 
     // Fetch total projects data (leads)
     const leads = await db.lead.findMany();
-    
+
     // Fetch vendor payments data
     const vendorPayments = await db.transactionNote.findMany({
       where: {
         transactionName: "VENDOR_PAYMENT",
       },
     });
-    
+
     // Fetch store expenses data
     const storeExpenses = await db.storeExpNotes.findMany();
 
@@ -58,17 +58,36 @@ export async function GET(request: NextRequest) {
     let totalProfit = 0;
     let totalRevenue = 0;
     let totalProjects = leads.length;
-    let totalVendorPayments = vendorPayments.reduce((sum, payment) => sum + payment.amount, 0);
-    let totalExpenses = storeExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    let totalVendorPayments = 0; // Initialize to 0, will calculate later
+    let totalExpenses = 0; // Initialize to 0, will calculate later
 
     // Helper function to get month number from various formats
     const getMonthNumber = (monthRaw: string | number): number => {
       if (typeof monthRaw === "string" && isNaN(Number(monthRaw))) {
         const monthMap: Record<string, number> = {
-          january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
-          july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
-          jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7,
-          aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+          january: 1,
+          february: 2,
+          march: 3,
+          april: 4,
+          may: 5,
+          june: 6,
+          july: 7,
+          august: 8,
+          september: 9,
+          october: 10,
+          november: 11,
+          december: 12,
+          jan: 1,
+          feb: 2,
+          mar: 3,
+          apr: 4,
+          jun: 6,
+          jul: 7,
+          aug: 8,
+          sep: 9,
+          oct: 10,
+          nov: 11,
+          dec: 12,
         };
         return monthMap[monthRaw.toLowerCase()] || 1;
       } else {
@@ -76,16 +95,28 @@ export async function GET(request: NextRequest) {
       }
     };
 
+    // Standardize month format for keys
+    const getStandardMonthKey = (month: string | number, year: string | number) => {
+      // For monthWiseRevenue, we want to keep the original format
+      return `${month}-${year}`;
+    };
+
+    // Get standard month-year key for aggregations
+    const getStandardizedMonthYearKey = (month: number, year: number) => {
+      return `${month}-${year}`;
+    };
+
     // Calculate month/year based metrics for leads
     leads.forEach((lead) => {
       const createdDate = new Date(lead.createdAt);
       const month = createdDate.getMonth() + 1; // JS months are 0-indexed
       const year = createdDate.getFullYear();
-      const monthYearKey = `${month}-${year}`;
+      const monthYearKey = getStandardizedMonthYearKey(month, year);
       const yearKey = `${year}`;
-      const finYear = month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+      const finYear =
+        month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
       const store = lead.store;
-      
+
       // Initialize monthly totals
       if (!monthWiseTotals[monthYearKey]) {
         monthWiseTotals[monthYearKey] = {
@@ -95,7 +126,7 @@ export async function GET(request: NextRequest) {
         };
       }
       monthWiseTotals[monthYearKey].totalProjects += 1;
-      
+
       // Initialize yearly totals
       if (!yearWiseTotals[yearKey]) {
         yearWiseTotals[yearKey] = {
@@ -105,7 +136,7 @@ export async function GET(request: NextRequest) {
         };
       }
       yearWiseTotals[yearKey].totalProjects += 1;
-      
+
       // Initialize financial year totals
       if (!finYearWiseTotals[finYear]) {
         finYearWiseTotals[finYear] = {
@@ -115,7 +146,7 @@ export async function GET(request: NextRequest) {
         };
       }
       finYearWiseTotals[finYear].totalProjects += 1;
-      
+
       // Initialize store totals
       if (!storeWiseTotals[store]) {
         storeWiseTotals[store] = {
@@ -127,87 +158,212 @@ export async function GET(request: NextRequest) {
       storeWiseTotals[store].totalProjects += 1;
     });
 
-    // Calculate vendor payments by time periods
+    // Process vendor payments and aggregate by various time periods and stores
     vendorPayments.forEach((payment) => {
       const transactionDate = new Date(payment.transactionDate);
       const month = transactionDate.getMonth() + 1;
       const year = transactionDate.getFullYear();
-      const monthYearKey = `${month}-${year}`;
+      
+      // Create standardized and display month-year keys
+      const standardMonthYearKey = getStandardizedMonthYearKey(month, year);
+      
+      // Get month name for display
+      const monthName = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(transactionDate);
+      const displayMonthYearKey = `${monthName}-${year}`;
+      
       const yearKey = `${year}`;
       const finYear = month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
       
-      // Get lead and store info
+      // Get lead and store info by joining with the leads data
       const leadId = payment.leadId;
-      const lead = leads.find(l => l.id === leadId);
+      const lead = leads.find((l) => l.id === leadId);
       const store = lead ? lead.store : "Unknown Store";
       
       // Update monthly totals
-      if (monthWiseTotals[monthYearKey]) {
-        monthWiseTotals[monthYearKey].totalVendorPayments += payment.amount;
+      if (!monthWiseTotals[standardMonthYearKey]) {
+        monthWiseTotals[standardMonthYearKey] = {
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0
+        };
       }
+      monthWiseTotals[standardMonthYearKey].totalVendorPayments += payment.amount;
+      
+      // Make sure the displayMonthYearKey exists in monthWiseRevenue
+      if (!monthWiseRevenue[displayMonthYearKey]) {
+        monthWiseRevenue[displayMonthYearKey] = {
+          totalProfit: 0,
+          revenue: 0,
+          projectClose: 0,
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0,
+          displayMonth: monthName,
+          year
+        };
+      }
+      
+      // Update vendor payments directly in monthWiseRevenue
+      monthWiseRevenue[displayMonthYearKey].totalVendorPayments += payment.amount;
       
       // Update yearly totals
-      if (yearWiseTotals[yearKey]) {
-        yearWiseTotals[yearKey].totalVendorPayments += payment.amount;
+      if (!yearWiseTotals[yearKey]) {
+        yearWiseTotals[yearKey] = {
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0
+        };
       }
+      yearWiseTotals[yearKey].totalVendorPayments += payment.amount;
       
       // Update financial year totals
-      if (finYearWiseTotals[finYear]) {
-        finYearWiseTotals[finYear].totalVendorPayments += payment.amount;
+      if (!finYearWiseTotals[finYear]) {
+        finYearWiseTotals[finYear] = {
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0
+        };
       }
+      finYearWiseTotals[finYear].totalVendorPayments += payment.amount;
       
       // Update store totals
-      if (storeWiseTotals[store]) {
-        storeWiseTotals[store].totalVendorPayments += payment.amount;
+      if (!storeWiseTotals[store]) {
+        storeWiseTotals[store] = {
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0
+        };
       }
+      storeWiseTotals[store].totalVendorPayments += payment.amount;
+      
+      // Update store-specific monthly data
+      if (!storeMonthlyRevenue[store]) {
+        storeMonthlyRevenue[store] = {};
+      }
+      if (!storeMonthlyRevenue[store][displayMonthYearKey]) {
+        storeMonthlyRevenue[store][displayMonthYearKey] = {
+          month: monthName,
+          year: year.toString(),
+          totalProfit: 0,
+          revenue: 0,
+          projectClose: 0,
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0
+        };
+      }
+      storeMonthlyRevenue[store][displayMonthYearKey].totalVendorPayments += payment.amount;
     });
 
-    // Calculate store expenses by time periods
+    // Process store expenses and aggregate by various time periods and stores
     storeExpenses.forEach((expense) => {
       const expenseDate = new Date(expense.date);
       const month = expenseDate.getMonth() + 1;
       const year = expenseDate.getFullYear();
-      const monthYearKey = `${month}-${year}`;
+      
+      // Create standardized and display month-year keys
+      const standardMonthYearKey = getStandardizedMonthYearKey(month, year);
+      
+      // Get month name for display
+      const monthName = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(expenseDate);
+      const displayMonthYearKey = `${monthName}-${year}`;
+      
       const yearKey = `${year}`;
       const finYear = month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
       
-      // Get user's store
+      // Get user's store by joining with the revenue data
       const userId = expense.userId;
-      const user = revenues.find(r => r.userId === userId)?.User;
+      const user = revenues.find((r) => r.userId === userId)?.User;
       const store = user?.store || "Unknown Store";
       
       // Update monthly totals
-      if (monthWiseTotals[monthYearKey]) {
-        monthWiseTotals[monthYearKey].totalExpenses += expense.amount;
+      if (!monthWiseTotals[standardMonthYearKey]) {
+        monthWiseTotals[standardMonthYearKey] = {
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0
+        };
       }
+      monthWiseTotals[standardMonthYearKey].totalExpenses += expense.amount;
+      
+      // Make sure the displayMonthYearKey exists in monthWiseRevenue
+      if (!monthWiseRevenue[displayMonthYearKey]) {
+        monthWiseRevenue[displayMonthYearKey] = {
+          totalProfit: 0,
+          revenue: 0,
+          projectClose: 0,
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0,
+          displayMonth: monthName,
+          year
+        };
+      }
+      
+      // Update expenses directly in monthWiseRevenue
+      monthWiseRevenue[displayMonthYearKey].totalExpenses += expense.amount;
       
       // Update yearly totals
-      if (yearWiseTotals[yearKey]) {
-        yearWiseTotals[yearKey].totalExpenses += expense.amount;
+      if (!yearWiseTotals[yearKey]) {
+        yearWiseTotals[yearKey] = {
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0
+        };
       }
+      yearWiseTotals[yearKey].totalExpenses += expense.amount;
       
       // Update financial year totals
-      if (finYearWiseTotals[finYear]) {
-        finYearWiseTotals[finYear].totalExpenses += expense.amount;
+      if (!finYearWiseTotals[finYear]) {
+        finYearWiseTotals[finYear] = {
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0
+        };
       }
+      finYearWiseTotals[finYear].totalExpenses += expense.amount;
       
       // Update store totals
-      if (storeWiseTotals[store]) {
-        storeWiseTotals[store].totalExpenses += expense.amount;
+      if (!storeWiseTotals[store]) {
+        storeWiseTotals[store] = {
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0
+        };
       }
+      storeWiseTotals[store].totalExpenses += expense.amount;
+      
+      // Update store-specific monthly data
+      if (!storeMonthlyRevenue[store]) {
+        storeMonthlyRevenue[store] = {};
+      }
+      if (!storeMonthlyRevenue[store][displayMonthYearKey]) {
+        storeMonthlyRevenue[store][displayMonthYearKey] = {
+          month: monthName,
+          year: year.toString(),
+          totalProfit: 0,
+          revenue: 0,
+          projectClose: 0,
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0
+        };
+      }
+      storeMonthlyRevenue[store][displayMonthYearKey].totalExpenses += expense.amount;
     });
 
     // Process revenue data as in the original code
     revenues.forEach((rev) => {
       // Ensure month is parsed as a number and in a valid range (1-12)
       const monthNum = getMonthNumber(rev.month);
-      
+
       // Ensure month is between 1-12
       const month = Math.max(1, Math.min(12, monthNum));
 
       // Make sure year is a number
       const year = Number(rev.year);
-      const monthYearKey = `${rev.month}-${rev.year}`;
+      const monthYearKey = getStandardMonthKey(rev.month, rev.year);
+      const standardMonthYearKey = getStandardizedMonthYearKey(month, year);
       const yearKey = `${rev.year}`;
       const userId = rev.userId;
       const store = rev.User?.store || "Unknown Store"; // Handle users with no store
@@ -228,33 +384,72 @@ export async function GET(request: NextRequest) {
           totalProfit: 0,
           revenue: 0,
           projectClose: 0,
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0,
         };
       }
       monthWiseRevenue[monthYearKey].totalProfit += rev.totalProfit;
       monthWiseRevenue[monthYearKey].revenue += rev.revenue;
       monthWiseRevenue[monthYearKey].projectClose += rev.projectClose;
 
+      // Copy metrics from monthWiseTotals if available
+      if (monthWiseTotals[standardMonthYearKey]) {
+        monthWiseRevenue[monthYearKey].totalProjects = 
+          monthWiseTotals[standardMonthYearKey].totalProjects;
+        monthWiseRevenue[monthYearKey].totalVendorPayments = 
+          monthWiseTotals[standardMonthYearKey].totalVendorPayments;
+        monthWiseRevenue[monthYearKey].totalExpenses = 
+          monthWiseTotals[standardMonthYearKey].totalExpenses;
+      }
+
       if (!yearWiseRevenue[yearKey]) {
         yearWiseRevenue[yearKey] = {
           totalProfit: 0,
           revenue: 0,
           projectClose: 0,
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0,
         };
       }
       yearWiseRevenue[yearKey].totalProfit += rev.totalProfit;
       yearWiseRevenue[yearKey].revenue += rev.revenue;
       yearWiseRevenue[yearKey].projectClose += rev.projectClose;
 
+      // Copy metrics from yearWiseTotals
+      if (yearWiseTotals[yearKey]) {
+        yearWiseRevenue[yearKey].totalProjects = 
+          yearWiseTotals[yearKey].totalProjects;
+        yearWiseRevenue[yearKey].totalVendorPayments = 
+          yearWiseTotals[yearKey].totalVendorPayments;
+        yearWiseRevenue[yearKey].totalExpenses = 
+          yearWiseTotals[yearKey].totalExpenses;
+      }
+
       if (!finYearWiseRevenue[finYear]) {
         finYearWiseRevenue[finYear] = {
           totalProfit: 0,
           revenue: 0,
           projectClose: 0,
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0,
         };
       }
       finYearWiseRevenue[finYear].totalProfit += rev.totalProfit;
       finYearWiseRevenue[finYear].revenue += rev.revenue;
       finYearWiseRevenue[finYear].projectClose += rev.projectClose;
+
+      // Copy metrics from finYearWiseTotals
+      if (finYearWiseTotals[finYear]) {
+        finYearWiseRevenue[finYear].totalProjects = 
+          finYearWiseTotals[finYear].totalProjects;
+        finYearWiseRevenue[finYear].totalVendorPayments = 
+          finYearWiseTotals[finYear].totalVendorPayments;
+        finYearWiseRevenue[finYear].totalExpenses = 
+          finYearWiseTotals[finYear].totalExpenses;
+      }
 
       if (!userStoreWiseRevenue[userStoreKey]) {
         userStoreWiseRevenue[userStoreKey] = {
@@ -282,11 +477,24 @@ export async function GET(request: NextRequest) {
           totalProfit: 0,
           revenue: 0,
           projectClose: 0,
+          totalProjects: 0,
+          totalVendorPayments: 0,
+          totalExpenses: 0,
         };
       }
       storeMonthlyRevenue[store][monthYearKey].totalProfit += rev.totalProfit;
       storeMonthlyRevenue[store][monthYearKey].revenue += rev.revenue;
       storeMonthlyRevenue[store][monthYearKey].projectClose += rev.projectClose;
+
+      // Copy metrics for this store's month from monthWiseTotals if available
+      if (monthWiseTotals[standardMonthYearKey]) {
+        storeMonthlyRevenue[store][monthYearKey].totalProjects = 
+          storeWiseTotals[store]?.totalProjects || 0;
+        storeMonthlyRevenue[store][monthYearKey].totalVendorPayments = 
+          storeWiseTotals[store]?.totalVendorPayments || 0;
+        storeMonthlyRevenue[store][monthYearKey].totalExpenses = 
+          storeWiseTotals[store]?.totalExpenses || 0;
+      }
 
       // 2. Store Quarterly Revenue - Fixed to use proper quarters
       if (!storeQuarterlyRevenue[store]) {
@@ -342,56 +550,7 @@ export async function GET(request: NextRequest) {
       totalRevenue += rev.revenue;
     });
 
-    // Merge the additional metrics into existing data structures
-    Object.keys(monthWiseRevenue).forEach(key => {
-      if (monthWiseTotals[key]) {
-        monthWiseRevenue[key] = {
-          ...monthWiseRevenue[key],
-          ...monthWiseTotals[key]
-        };
-      } else {
-        monthWiseRevenue[key] = {
-          ...monthWiseRevenue[key],
-          totalProjects: 0,
-          totalVendorPayments: 0,
-          totalExpenses: 0
-        };
-      }
-    });
-
-    Object.keys(yearWiseRevenue).forEach(key => {
-      if (yearWiseTotals[key]) {
-        yearWiseRevenue[key] = {
-          ...yearWiseRevenue[key],
-          ...yearWiseTotals[key]
-        };
-      } else {
-        yearWiseRevenue[key] = {
-          ...yearWiseRevenue[key],
-          totalProjects: 0,
-          totalVendorPayments: 0,
-          totalExpenses: 0
-        };
-      }
-    });
-
-    Object.keys(finYearWiseRevenue).forEach(key => {
-      if (finYearWiseTotals[key]) {
-        finYearWiseRevenue[key] = {
-          ...finYearWiseRevenue[key],
-          ...finYearWiseTotals[key]
-        };
-      } else {
-        finYearWiseRevenue[key] = {
-          ...finYearWiseRevenue[key],
-          totalProjects: 0,
-          totalVendorPayments: 0,
-          totalExpenses: 0
-        };
-      }
-    });
-
-    // Format store data for response
+        // Format store data for response with proper metrics for each level
     const formattedStoreData = Object.keys(storeMonthlyRevenue).map((store) => {
       // Get store totals
       const storeTotals = storeWiseTotals[store] || {
@@ -399,52 +558,114 @@ export async function GET(request: NextRequest) {
         totalVendorPayments: 0,
         totalExpenses: 0
       };
-
-      // Add totals to monthly data
-      const monthlyData = Object.values(storeMonthlyRevenue[store]).map(monthData => {
-        const monthYear = `${monthData.month}-${monthData.year}`;
-        const monthTotals = monthWiseTotals[monthYear] || {
-          totalProjects: 0,
-          totalVendorPayments: 0,
-          totalExpenses: 0
-        };
-        return { ...monthData, ...monthTotals };
+      
+      // Calculate quarter-wise store metrics
+      const storeQuarters = new Map();
+      
+      // Process monthly data to build quarters
+      Object.values(storeMonthlyRevenue[store]).forEach(monthData => {
+        const monthNum = getMonthNumber(monthData.month);
+        const year = Number(monthData.year);
+        const quarter = Math.ceil(monthNum / 3);
+        const quarterKey = `Q${quarter}-${year}`;
+        
+        if (!storeQuarters.has(quarterKey)) {
+          storeQuarters.set(quarterKey, {
+            quarter,
+            year,
+            totalProfit: 0,
+            revenue: 0,
+            projectClose: 0,
+            totalProjects: storeTotals.totalProjects,
+            totalVendorPayments: storeTotals.totalVendorPayments, 
+            totalExpenses: storeTotals.totalExpenses
+          });
+        }
+        
+        const quarterData = storeQuarters.get(quarterKey);
+        quarterData.totalProfit += monthData.totalProfit || 0;
+        quarterData.revenue += monthData.revenue || 0;
+        quarterData.projectClose += monthData.projectClose || 0;
       });
-
-      // Add totals to quarterly data
-      const quarterlyData = Object.values(storeQuarterlyRevenue[store]).map(quarterData => {
-        return { ...quarterData, ...storeTotals };
+      
+      // Format month data
+      const monthlyData = Object.values(storeMonthlyRevenue[store]);
+      
+      // Format quarter data
+      const quarterlyData = Array.from(storeQuarters.values());
+      
+      // Calculate yearly totals
+      const storeYears = new Map();
+      Object.values(storeMonthlyRevenue[store]).forEach(monthData => {
+        const year = Number(monthData.year);
+        const yearKey = `${year}`;
+        
+        if (!storeYears.has(yearKey)) {
+          storeYears.set(yearKey, {
+            year,
+            totalProfit: 0,
+            revenue: 0,
+            projectClose: 0,
+            totalProjects: yearWiseTotals[yearKey]?.totalProjects || 0,
+            totalVendorPayments: yearWiseTotals[yearKey]?.totalVendorPayments || 0,
+            totalExpenses: yearWiseTotals[yearKey]?.totalExpenses || 0
+          });
+        }
+        
+        const yearData = storeYears.get(yearKey);
+        yearData.totalProfit += monthData.totalProfit || 0;
+        yearData.revenue += monthData.revenue || 0;
+        yearData.projectClose += monthData.projectClose || 0;
       });
-
-      // Add totals to yearly data
-      const yearlyData = Object.values(storeYearlyRevenue[store]).map(yearData => {
-        const yearTotals = yearWiseTotals[yearData.year] || {
-          totalProjects: 0,
-          totalVendorPayments: 0,
-          totalExpenses: 0
-        };
-        return { ...yearData, ...yearTotals };
+      
+      // Format yearly data
+      const yearlyData = Array.from(storeYears.values());
+      
+      // Calculate financial year totals
+      const storeFinYears = new Map();
+      Object.values(storeMonthlyRevenue[store]).forEach(monthData => {
+        const monthNum = getMonthNumber(monthData.month);
+        const year = Number(monthData.year);
+        const finYear = monthNum >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+        
+        if (!storeFinYears.has(finYear)) {
+          storeFinYears.set(finYear, {
+            finYear,
+            totalProfit: 0,
+            revenue: 0,
+            projectClose: 0,
+            totalProjects: finYearWiseTotals[finYear]?.totalProjects || 0,
+            totalVendorPayments: finYearWiseTotals[finYear]?.totalVendorPayments || 0, 
+            totalExpenses: finYearWiseTotals[finYear]?.totalExpenses || 0
+          });
+        }
+        
+        const finYearData = storeFinYears.get(finYear);
+        finYearData.totalProfit += monthData.totalProfit || 0;
+        finYearData.revenue += monthData.revenue || 0;
+        finYearData.projectClose += monthData.projectClose || 0;
       });
-
-      // Add totals to financial year data
-      const finYearData = Object.values(storeFinYearRevenue[store]).map(finYearData => {
-        const finYearTotals = finYearWiseTotals[finYearData.finYear] || {
-          totalProjects: 0,
-          totalVendorPayments: 0,
-          totalExpenses: 0
-        };
-        return { ...finYearData, ...finYearTotals };
-      });
-
+      
+      // Format financial year data
+      const finYearData = Array.from(storeFinYears.values());
+      
       return {
         store,
         monthly: monthlyData,
         quarterly: quarterlyData,
         yearly: yearlyData,
         financialYear: finYearData,
-        ...storeTotals  // Add store totals at the store level
+        ...storeTotals // Add store totals at the store level
       };
     });
+
+    // Calculate total vendor payments and expenses
+    totalVendorPayments = vendorPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    totalExpenses = storeExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    
+    // Log the calculated totals for debugging
+    console.log("Total Vendor Payments:", totalVendorPayments);
+    console.log("Total Expenses:", totalExpenses);
 
     console.log("Month-wise Revenue:", monthWiseRevenue);
     console.log("Year-wise Revenue:", yearWiseRevenue);
