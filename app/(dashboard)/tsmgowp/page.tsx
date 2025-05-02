@@ -263,6 +263,7 @@ export default function Dashboard() {
             receiveOnline: item.receiveOnline,
             payInCash: item.payInCash,
             payInOnline: item.payInOnline,
+            totalExpenses: item.totalExpenses,
           };
           return acc;
         },
@@ -723,7 +724,6 @@ export default function Dashboard() {
                     </p>
                   </CardContent>
                 </Card>
-
                 {/* Total Profit - shown in both tabs */}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -774,41 +774,49 @@ export default function Dashboard() {
                     </p>
                   </CardContent>
                 </Card>
-
                 {/* Projects Closed/Live - shown in both tabs with conditional title */}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium">
-                      {activeTab === "handover"
-                        ? "Projects Closed"
-                        : "Projects Live"}
+                      Projects Live
                     </CardTitle>
                     <Package className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
                       {timeframe === "financial"
-                        ? selectedFinYearData?.projectClose ||
-                          (activeTab === "ongoing"
-                            ? selectedFinYearData?.totalProjects || 0
-                            : 0)
+                        ? selectedFinYearData?.totalProjects || 0
                         : filteredData.reduce(
-                            (acc, item) =>
-                              acc +
-                              (activeTab === "handover"
-                                ? item.projectClose
-                                : item.totalProjects || 0),
+                            (acc, item) => acc + (item.totalProjects || 0),
                             0
                           )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {activeTab === "handover"
-                        ? "Successfully completed projects"
-                        : "Currently active projects"}
+                      Currently active projects
                     </p>
                   </CardContent>
                 </Card>
-
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Projects Closed
+                    </CardTitle>
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {timeframe === "financial"
+                        ? selectedFinYearData?.projectClose || 0
+                        : filteredData.reduce(
+                            (acc, item) => acc + (item.projectClose || 0),
+                            0
+                          )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Successfully completed projects
+                    </p>
+                  </CardContent>
+                </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium">
@@ -831,6 +839,30 @@ export default function Dashboard() {
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Total payments to vendors
+                    </p>
+                  </CardContent>
+                </Card>{" "}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Total Expenses
+                    </CardTitle>
+                    <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      ₹
+                      {formatNumber(
+                        timeframe === "financial"
+                          ? selectedFinYearData?.totalExpenses || 0
+                          : filteredData.reduce(
+                              (acc, item) => acc + (item.totalExpenses || 0),
+                              0
+                            )
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Total Expenses
                     </p>
                   </CardContent>
                 </Card>
@@ -981,42 +1013,41 @@ export default function Dashboard() {
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span>
-                          Projects{" "}
-                          {activeTab === "handover" ? "Closed" : "Live"}:
-                        </span>
+                        <span>Projects Closed:</span>
                         <span className="font-semibold">
                           {isStoreManager
-                            ? activeTab === "handover"
-                              ? data.totalProjectClose
-                              : data.totalProjects
-                            : activeTab === "handover"
-                            ? selectedFinYearData?.projectClose || 0
+                            ? data.totalProjectClose
+                            : selectedFinYearData?.projectClose || 0}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between">
+                        <span>Projects Live:</span>
+                        <span className="font-semibold">
+                          {isStoreManager
+                            ? data.totalProjects
                             : selectedFinYearData?.totalProjects || 0}
                         </span>
                       </div>
-                      {activeTab === "ongoing" && (
-                        <>
-                          <div className="flex justify-between">
-                            <span>Vendor Payments:</span>
-                            <span className="font-semibold">
-                              ₹
-                              {formatNumber(
-                                selectedFinYearData?.totalVendorPayments || 0
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Expenses:</span>
-                            <span className="font-semibold">
-                              ₹
-                              {formatNumber(
-                                selectedFinYearData?.totalExpenses || 0
-                              )}
-                            </span>
-                          </div>
-                        </>
-                      )}
+
+                      <div className="flex justify-between">
+                        <span>Vendor Payments:</span>
+                        <span className="font-semibold">
+                          ₹
+                          {formatNumber(
+                            selectedFinYearData?.totalVendorPayments || 0
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Expenses:</span>
+                        <span className="font-semibold">
+                          ₹
+                          {formatNumber(
+                            selectedFinYearData?.totalExpenses || 0
+                          )}
+                        </span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1204,6 +1235,17 @@ export default function Dashboard() {
                                       ₹
                                       {formatNumber(
                                         displayData.totalVendorPayments || 0
+                                      )}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium">
+                                     Expenses
+                                    </p>
+                                    <p className="text-sm font-bold">
+                                      ₹
+                                      {formatNumber(
+                                        displayData.totalExpenses || 0
                                       )}
                                     </p>
                                   </div>
