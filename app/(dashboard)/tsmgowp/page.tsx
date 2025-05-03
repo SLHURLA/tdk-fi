@@ -117,6 +117,29 @@ interface FinYearData {
   payInOnline?: number;
 }
 
+const monthOrder = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+const sortByMonth = (data: RevenueData[]) => {
+  return [...data].sort((a, b) => {
+    const monthA = (a.month || a.monthYear)?.split("-")[0] || "";
+    const monthB = (b.month || b.monthYear)?.split("-")[0] || "";
+    return monthOrder.indexOf(monthA) - monthOrder.indexOf(monthB);
+  });
+};
+
 // Format numbers with commas for better readability
 const formatNumber = (num: number): string => {
   return num?.toLocaleString("en-IN");
@@ -308,10 +331,12 @@ export default function Dashboard() {
   const getFilteredData = (): RevenueData[] => {
     switch (timeframe) {
       case "yearly":
-        return revenueData.filter((item) => {
+        const yearlyData = revenueData.filter((item) => {
           const monthYear = item.month || item.monthYear;
           return monthYear?.endsWith(selectedYear);
         });
+        return sortByMonth(yearlyData);
+
       case "monthly":
         return revenueData.filter(
           (item) =>
@@ -822,7 +847,7 @@ export default function Dashboard() {
                     <CardTitle className="text-sm font-medium">
                       Vendor Payments
                     </CardTitle>
-                    <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
+                    <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
@@ -847,7 +872,7 @@ export default function Dashboard() {
                     <CardTitle className="text-sm font-medium">
                       Total Expenses
                     </CardTitle>
-                    <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
+                    <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
@@ -876,7 +901,7 @@ export default function Dashboard() {
                       <CardTitle className="text-sm font-medium">
                         Pay in Cash
                       </CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
@@ -900,7 +925,7 @@ export default function Dashboard() {
                       <CardTitle className="text-sm font-medium">
                         Pay Online
                       </CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
@@ -924,7 +949,7 @@ export default function Dashboard() {
                       <CardTitle className="text-sm font-medium">
                         Receive in Cash
                       </CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
@@ -948,7 +973,7 @@ export default function Dashboard() {
                       <CardTitle className="text-sm font-medium">
                         Receive Online
                       </CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
@@ -1240,7 +1265,7 @@ export default function Dashboard() {
                                   </div>
                                   <div>
                                     <p className="text-sm font-medium">
-                                     Expenses
+                                      Expenses
                                     </p>
                                     <p className="text-sm font-bold">
                                       ₹
@@ -1387,7 +1412,8 @@ interface RevenueChartProps {
 }
 
 function RevenueChart({ data, timeframe }: RevenueChartProps) {
-  const totalRevenue = data.reduce((acc, item) => acc + item.revenue, 0);
+  const sortedData = timeframe === "yearly" ? sortByMonth(data) : data;
+  const totalRevenue = sortedData.reduce((acc, item) => acc + item.revenue, 0);
 
   // Extract month names from the data
   const getMonthLabels = () => {
@@ -1500,7 +1526,8 @@ interface ProfitChartProps {
 
 function ProfitChart({ data, timeframe }: ProfitChartProps) {
   // Calculate total profit
-  const total = data.reduce((acc, item) => acc + item.totalProfit, 0);
+  const sortedData = timeframe === "yearly" ? sortByMonth(data) : data;
+  const total = sortedData.reduce((acc, item) => acc + item.totalProfit, 0);
 
   // Calculate maxProfit
   const maxProfit = Math.max(...data.map((item) => item.totalProfit));
