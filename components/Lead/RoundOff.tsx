@@ -85,12 +85,12 @@ const RoundOff: React.FC<RoundOffProps> = ({ leadId }) => {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+      {/* <DialogTrigger asChild>
         <Button variant="outline" className="flex items-center">
           <IndianRupee className="mr-1 h-4 w-4" />
           Round Off
         </Button>
-      </DialogTrigger>
+      </DialogTrigger> */}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Round Off Adjustment</DialogTitle>
