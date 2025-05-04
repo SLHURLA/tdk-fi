@@ -291,7 +291,8 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
                   variant="secondary"
                   className="px-3 py-1 flex items-center gap-1"
                 >
-                  {vendor.name} {vendor.city && `(${vendor.city})`}
+                  {vendor.name}
+                  {/* {vendor.city && `(${vendor.city})`} */}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -329,7 +330,8 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
               className="flex items-center justify-between p-3 hover:bg-muted/20"
             >
               <span className="font-medium">
-                {vendor.name} {vendor.city && `(${vendor.city})`}
+                {vendor.name}
+                {/* {vendor.city && `(${vendor.city})`} */}
               </span>
               <Button
                 size="sm"

@@ -481,7 +481,8 @@ const Vendors: React.FC<VendorsProps> = ({
               <SelectContent>
                 {availableVendors?.map((vendor: Vendor) => (
                   <SelectItem key={vendor.id} value={vendor.id.toString()}>
-                    {vendor.name} - {vendor.city}
+                    {vendor.name}
+                    {/* - {vendor.city} */}
                   </SelectItem>
                 ))}
               </SelectContent>

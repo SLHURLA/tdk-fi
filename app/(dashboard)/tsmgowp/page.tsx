@@ -749,34 +749,51 @@ export default function Dashboard() {
                     </p>
                   </CardContent>
                 </Card>
-                {/* Total Profit - shown in both tabs */}
+                {/* total expenses */}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium">
-                      Total Profit
+                      Total Expenses
                     </CardTitle>
-                    <span className="text-muted-foreground items-center justify-center">
-                      ₹
-                    </span>
+                    <Package className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
                       ₹
                       {formatNumber(
-                        isStoreManager
-                          ? data.totalProfit
-                          : timeframe === "financial" && selectedFinYearData
-                          ? selectedFinYearData.totalProfit || 0
+                        timeframe === "financial"
+                          ? (selectedFinYearData?.totalVendorPayments || 0) +
+                              (selectedFinYearData?.totalExpenses || 0)
                           : filteredData.reduce(
-                              (acc, item) => acc + item.totalProfit,
+                              (acc, item) =>
+                                acc +
+                                (item.totalVendorPayments || 0) +
+                                (item.totalExpenses || 0),
                               0
                             )
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                      <TrendingUp className="h-3 w-3 text-green-500" />
-                      <span className="text-green-500">
-                        {calculateGrowth(
+
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Your total expenses
+                    </p>
+                  </CardContent>
+                </Card>
+                {/* Total Profit - shown in both tabs */}
+                {activeTab === "handover" && (
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Total Profit
+                      </CardTitle>
+                      <span className="text-muted-foreground items-center justify-center">
+                        ₹
+                      </span>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        ₹
+                        {formatNumber(
                           isStoreManager
                             ? data.totalProfit
                             : timeframe === "financial" && selectedFinYearData
@@ -784,23 +801,38 @@ export default function Dashboard() {
                             : filteredData.reduce(
                                 (acc, item) => acc + item.totalProfit,
                                 0
-                              ),
-                          previousData.totalProfit
+                              )
                         )}
-                      </span>{" "}
-                      from previous{" "}
-                      {timeframe === "yearly"
-                        ? "year"
-                        : timeframe === "monthly"
-                        ? "month"
-                        : timeframe === "quarterly"
-                        ? "quarter"
-                        : "financial year"}
-                    </p>
-                  </CardContent>
-                </Card>
+                      </div>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                        <TrendingUp className="h-3 w-3 text-green-500" />
+                        <span className="text-green-500">
+                          {calculateGrowth(
+                            isStoreManager
+                              ? data.totalProfit
+                              : timeframe === "financial" && selectedFinYearData
+                              ? selectedFinYearData.totalProfit || 0
+                              : filteredData.reduce(
+                                  (acc, item) => acc + item.totalProfit,
+                                  0
+                                ),
+                            previousData.totalProfit
+                          )}
+                        </span>{" "}
+                        from previous{" "}
+                        {timeframe === "yearly"
+                          ? "year"
+                          : timeframe === "monthly"
+                          ? "month"
+                          : timeframe === "quarterly"
+                          ? "quarter"
+                          : "financial year"}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
                 {/* Projects Closed/Live - shown in both tabs with conditional title */}
-                <Card>
+                {/* <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium">
                       Projects Live
@@ -820,28 +852,30 @@ export default function Dashboard() {
                       Currently active projects
                     </p>
                   </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Projects Closed
-                    </CardTitle>
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {timeframe === "financial"
-                        ? selectedFinYearData?.projectClose || 0
-                        : filteredData.reduce(
-                            (acc, item) => acc + (item.projectClose || 0),
-                            0
-                          )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Successfully completed projects
-                    </p>
-                  </CardContent>
-                </Card>
+                </Card> */}
+                {activeTab === "handover" && (
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Projects Closed
+                      </CardTitle>
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {timeframe === "financial"
+                          ? selectedFinYearData?.projectClose || 0
+                          : filteredData.reduce(
+                              (acc, item) => acc + (item.projectClose || 0),
+                              0
+                            )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Successfully completed projects
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium">
@@ -870,7 +904,7 @@ export default function Dashboard() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium">
-                      Total Expenses
+                      Total Store Expenses
                     </CardTitle>
                     <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -887,7 +921,7 @@ export default function Dashboard() {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Total Expenses
+                      Total Store Expenses
                     </p>
                   </CardContent>
                 </Card>
@@ -896,7 +930,7 @@ export default function Dashboard() {
               {/* Payment methods - only shown in ongoing tab */}
               {activeTab === "ongoing" && (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-6">
-                  <Card>
+                  {/* <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-medium">
                         Pay in Cash
@@ -919,8 +953,8 @@ export default function Dashboard() {
                         Total cash payments
                       </p>
                     </CardContent>
-                  </Card>
-                  <Card>
+                  </Card> */}
+                  {/* <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-medium">
                         Pay Online
@@ -943,7 +977,7 @@ export default function Dashboard() {
                         Total online payments
                       </p>
                     </CardContent>
-                  </Card>
+                  </Card> */}
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-medium">
@@ -989,6 +1023,34 @@ export default function Dashboard() {
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         Total online receipts
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Receive Total
+                      </CardTitle>
+                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        ₹
+                        {formatNumber(
+                          timeframe === "financial"
+                            ? (selectedFinYearData?.receiveOnline || 0) +
+                                (selectedFinYearData?.receiveCash || 0)
+                            : filteredData.reduce(
+                                (acc, item) =>
+                                  acc +
+                                  (item.receiveOnline || 0) +
+                                  (item.receiveCash || 0),
+                                0
+                              )
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total receipts Online + Cash
                       </p>
                     </CardContent>
                   </Card>

@@ -623,16 +623,18 @@ const InitLead: React.FC = () => {
                           <TableCell className="p-4">
                             {item.vendors && item.vendors.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
-                                {item.vendors.map((vendor) => (
-                                  <Badge
-                                    key={vendor.id}
-                                    variant="outline"
-                                    className="text-xs"
-                                  >
-                                    {vendor.name}{" "}
-                                    {vendor.city && `(${vendor.city})`}
-                                  </Badge>
-                                ))}
+                                {item.vendors
+                                  .filter((e) => e.city === data.store)
+                                  .map((vendor) => (
+                                    <Badge
+                                      key={vendor.id}
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      {vendor.name}{" "}
+                                      {/* {vendor.city && `(${vendor.city})`} */}
+                                    </Badge>
+                                  ))}
                               </div>
                             ) : (
                               "-"
