@@ -13,8 +13,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSession } from "next-auth/react";
 
-// Define types for vendors
 interface Vendor {
   id: string;
   name: string;
@@ -40,6 +40,7 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
   assignedVendors,
   onVendorRemove,
 }) => {
+  const { data: session } = useSession();
   const [searchResults, setSearchResults] = useState<Vendor[]>([]);
   const [filteredResults, setFilteredResults] = useState<Vendor[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -62,19 +63,16 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
     "Electrolux",
   ];
 
-  // Determine if the current area type is a sink or appliance
   const isSink = areaType === "Sink";
   const isAppliance = areaType === "Appliances";
   const shouldShowBrandDropdown = isSink || isAppliance;
 
-  // Get the appropriate brand options
   const getBrandOptions = () => {
     if (isSink) return sinkBrands;
     if (isAppliance) return applianceBrands;
     return [];
   };
 
-  // Search vendors function (server-side)
   const searchVendors = async () => {
     if (!areaType) return;
 
@@ -100,7 +98,6 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
     }
   };
 
-  // Handle getting all vendors
   const fetchAllVendors = async () => {
     setIsSearching(true);
 
@@ -123,7 +120,6 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
     }
   };
 
-  // Filter vendors by name (client-side)
   useEffect(() => {
     const vendorsToFilter = searchTab === "search" ? searchResults : allVendors;
 
@@ -142,19 +138,16 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
     setFilteredResults(filtered);
   }, [nameFilter, searchResults, allVendors, searchTab]);
 
-  // Reset filtered results when search results change
   useEffect(() => {
     setFilteredResults(searchResults);
   }, [searchResults]);
 
-  // Clear search results when tab changes
   useEffect(() => {
     if (searchTab === "search") {
       setSearchResults([]);
       setFilteredResults([]);
       setNameFilter("");
     } else {
-      // For "all" tab, use the already loaded vendors or show empty
       setFilteredResults(allVendorsLoaded ? allVendors : []);
       setNameFilter("");
     }
@@ -162,7 +155,6 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Brand Selection - Either dropdown or input */}
       <div className="space-y-2">
         <Label htmlFor="brand">Brand</Label>
         {shouldShowBrandDropdown ? (
@@ -188,7 +180,6 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
         )}
       </div>
 
-      {/* Search Tabs */}
       <Tabs
         value={searchTab}
         onValueChange={(value) => setSearchTab(value as "search" | "all")}
@@ -198,7 +189,6 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
           <TabsTrigger value="all">All Vendors</TabsTrigger>
         </TabsList>
 
-        {/* Search Tab Content */}
         <TabsContent value="search" className="space-y-4">
           <div className="space-y-2">
             <div className="flex justify-between items-center gap-2">
@@ -220,7 +210,6 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
               </Button>
             </div>
 
-            {/* Client-side search input */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
@@ -232,7 +221,6 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
               />
             </div>
 
-            {/* Message for no brand selected */}
             {shouldShowBrandDropdown && !brand && (
               <div className="text-amber-500 text-sm mt-1">
                 Please select a brand to search vendors
@@ -240,11 +228,9 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
             )}
           </div>
 
-          {/* Display search results */}
           {renderVendorResults()}
         </TabsContent>
 
-        {/* All Vendors Tab Content */}
         <TabsContent value="all" className="space-y-4">
           <div className="flex justify-between items-center">
             <Button
@@ -262,7 +248,6 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
             </Button>
           </div>
 
-          {/* Client-side search input for all vendors */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
@@ -274,12 +259,10 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
             />
           </div>
 
-          {/* Display all vendors results */}
           {renderVendorResults()}
         </TabsContent>
       </Tabs>
 
-      {/* Assigned Vendors */}
       {assignedVendors.length > 0 && (
         <Card className="mt-4">
           <CardContent className="pt-4">
@@ -292,7 +275,6 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
                   className="px-3 py-1 flex items-center gap-1"
                 >
                   {vendor.name}
-                  {/* {vendor.city && `(${vendor.city})`} */}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -310,7 +292,6 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
     </div>
   );
 
-  // Helper function to render vendor results
   function renderVendorResults() {
     if (isSearching) {
       return (
@@ -321,17 +302,22 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
       );
     }
 
-    if (filteredResults.length > 0) {
+    // Filter vendors based on session.user.store
+    const filteredVendors = filteredResults.filter(
+      (vendor) => session?.user?.store && vendor.city === session.user.store
+    );
+
+    if (filteredVendors.length > 0) {
       return (
         <div className="border rounded-md divide-y">
-          {filteredResults.map((vendor) => (
+          {filteredVendors.map((vendor) => (
             <div
               key={vendor.id}
               className="flex items-center justify-between p-3 hover:bg-muted/20"
             >
               <span className="font-medium">
                 {vendor.name}
-                {/* {vendor.city && `(${vendor.city})`} */}
+                {vendor.city && ` (${vendor.city})`}
               </span>
               <Button
                 size="sm"
@@ -349,15 +335,22 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
       );
     }
 
-    // No results after client-side filtering
     if (
       nameFilter &&
-      ((searchTab === "search" && searchResults.length > 0) ||
-        (searchTab === "all" && allVendorsLoaded))
+      filteredResults.length > 0 &&
+      filteredVendors.length === 0
     ) {
       return (
         <div className="flex items-center justify-center p-4 border rounded-md text-muted-foreground">
-          No vendors match your search filter.
+          No vendors in {session?.user?.store} match your search filter.
+        </div>
+      );
+    }
+
+    if (filteredResults.length > 0 && filteredVendors.length === 0) {
+      return (
+        <div className="flex items-center justify-center p-4 border rounded-md text-muted-foreground">
+          No vendors available in {session?.user?.store}.
         </div>
       );
     }
