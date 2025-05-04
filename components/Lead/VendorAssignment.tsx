@@ -29,6 +29,7 @@ interface VendorSelectionProps {
   onVendorAssign: (vendor: Vendor) => void;
   assignedVendors: Vendor[];
   onVendorRemove: (vendorId: string) => void;
+  store: string;
 }
 
 const VendorSelection: React.FC<VendorSelectionProps> = ({
@@ -39,6 +40,7 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
   onVendorAssign,
   assignedVendors,
   onVendorRemove,
+  store,
 }) => {
   const { data: session } = useSession();
   const [searchResults, setSearchResults] = useState<Vendor[]>([]);
@@ -304,7 +306,7 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
 
     // Filter vendors based on session.user.store
     const filteredVendors = filteredResults.filter(
-      (vendor) => session?.user?.store && vendor.city === session.user.store
+      (vendor) => vendor.city === store
     );
 
     if (filteredVendors.length > 0) {
@@ -342,7 +344,7 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
     ) {
       return (
         <div className="flex items-center justify-center p-4 border rounded-md text-muted-foreground">
-          No vendors in {session?.user?.store} match your search filter.
+          No vendors in {store} match your search filter.
         </div>
       );
     }
@@ -350,7 +352,7 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
     if (filteredResults.length > 0 && filteredVendors.length === 0) {
       return (
         <div className="flex items-center justify-center p-4 border rounded-md text-muted-foreground">
-          No vendors available in {session?.user?.store}.
+          No vendors available in {store}.
         </div>
       );
     }

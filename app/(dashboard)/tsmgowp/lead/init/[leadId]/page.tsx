@@ -98,6 +98,7 @@ const InitLead: React.FC = () => {
     `/getLead/${leadId}`,
     fetcher
   );
+
   const { toast } = useToast();
 
   const [providedItems, setProvidedItems] = useState<ProvidedItem[]>([]);
@@ -572,6 +573,7 @@ const InitLead: React.FC = () => {
               <BookItemSection
                 providedItems={providedItems}
                 setProvidedItems={setProvidedItems}
+                store={data.store}
               />
 
               {providedItems.length > 0 ? (
@@ -1076,6 +1078,7 @@ interface ProvidedItem {
 interface BookItemSectionProps {
   providedItems: ProvidedItem[];
   setProvidedItems: (items: ProvidedItem[]) => void;
+  store: string;
 }
 
 import {
@@ -1091,6 +1094,7 @@ import VendorSelection from "@/components/Lead/VendorAssignment";
 const BookItemSection: React.FC<BookItemSectionProps> = ({
   providedItems,
   setProvidedItems,
+  store,
 }) => {
   const [activeTab, setActiveTab] = useState<"main" | "additional">("main");
   const [areaType, setAreaType] = useState<string>("");
@@ -1443,6 +1447,7 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
             onVendorAssign={handleVendorAssign}
             assignedVendors={assignedVendors}
             onVendorRemove={handleVendorRemove}
+            store={store}
           />
 
           {/* Model Input */}
