@@ -319,7 +319,7 @@ const VendorSelection: React.FC<VendorSelectionProps> = ({
             >
               <span className="font-medium">
                 {vendor.name}
-                {vendor.city && ` (${vendor.city})`}
+                {/* {vendor.city && `(${vendor.city})`} */}
               </span>
               <Button
                 size="sm"
