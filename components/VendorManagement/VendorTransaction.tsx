@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowDownCircle, ArrowUpCircle, Banknote, Eye } from "lucide-react";
 import {
@@ -38,6 +38,37 @@ interface TransactionNotesProp {
 const TransactionNotes = ({ transactions }: TransactionNotesProp) => {
   const [selectedRemark, setSelectedRemark] = useState<string | null>(null);
 
+  // Calculate transaction sums based on payment method
+  const transactionSummary = useMemo(() => {
+    if (!transactions || transactions.length === 0) {
+      return {
+        cashTotal: 0,
+        onlineTotal: 0,
+        total: 0,
+      };
+    }
+
+    return transactions.reduce(
+      (acc, transaction) => {
+        const amount = transaction.amount;
+
+        if (transaction.paymentMethod === "CASH") {
+          acc.cashTotal += amount;
+        } else if (transaction.paymentMethod === "ONLINE") {
+          acc.onlineTotal += amount;
+        }
+
+        acc.total += amount;
+        return acc;
+      },
+      {
+        cashTotal: 0,
+        onlineTotal: 0,
+        total: 0,
+      }
+    );
+  }, [transactions]);
+
   if (!transactions || transactions.length === 0) {
     return (
       <Card className="lg:p-4 shadow-md rounded-lg mt-6 w-full">
@@ -63,6 +94,40 @@ const TransactionNotes = ({ transactions }: TransactionNotesProp) => {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Transaction Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card className="bg-blue-50">
+            <CardContent className="p-4">
+              <div className="text-sm text-gray-500 font-medium">
+                Total Amount
+              </div>
+              <div className="text-2xl font-bold mt-1">
+                ₹{transactionSummary.total.toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-green-50">
+            <CardContent className="p-4">
+              <div className="text-sm text-gray-500 font-medium">
+                Cash Transactions
+              </div>
+              <div className="text-2xl font-bold mt-1">
+                ₹{transactionSummary.cashTotal.toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-purple-50">
+            <CardContent className="p-4">
+              <div className="text-sm text-gray-500 font-medium">
+                Online Transactions
+              </div>
+              <div className="text-2xl font-bold mt-1">
+                ₹{transactionSummary.onlineTotal.toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="overflow-x-auto max-h-96 border rounded-md">
           <Table>
             <TableHeader>
