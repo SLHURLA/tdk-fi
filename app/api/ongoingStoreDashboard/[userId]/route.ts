@@ -94,6 +94,7 @@ export async function GET(
         user: {
           role: "STORE_MANAGER",
         },
+        status:"INPROGRESS"
       },
       include: {
         user: true,

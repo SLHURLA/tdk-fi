@@ -71,14 +71,20 @@ export async function GET() {
       where: { role: "STORE_MANAGER" },
       select: { id: true, store: true },
     });
-    
-    const storeManagerIds = storeManagers.map(manager => manager.id);
-    const userStoreMap = new Map(storeManagers.map(user => [user.id, user.store]));
-    
+
+    const storeManagerIds = storeManagers.map((manager) => manager.id);
+    const userStoreMap = new Map(
+      storeManagers.map((user) => [user.id, user.store])
+    );
+
     // OPTIMIZATION 2: Use single efficient query with proper filters
     const leads = await db.lead.findMany({
       where: {
         userId: { in: storeManagerIds },
+        user: {
+          role: "STORE_MANAGER",
+        },
+        status: "INPROGRESS",
       },
       include: {
         transactions: true,
@@ -180,16 +186,19 @@ export async function GET() {
         status,
         vendors,
       } = lead;
-      
+
       // OPTIMIZATION 5: Get store from pre-loaded map instead of database query
       const store = userStoreMap.get(userId) || "";
       if (!store) continue; // Skip if store not found
 
       // Calculate vendor payments
-      const vendorPayments = vendors.reduce((sum, vendor) => sum + vendor.GivenCharge, 0);
-      
+      const vendorPayments = vendors.reduce(
+        (sum, vendor) => sum + vendor.GivenCharge,
+        0
+      );
+
       // Calculate revenue and profit
-      const revenue = totalProjectCost + additionalItemsCost + totalGST;
+      const revenue = totalProjectCost;
       const profit = revenue - totalExp - vendorPayments;
 
       // Cash and online combined values
@@ -296,7 +305,7 @@ export async function GET() {
       groupedData.receiveOnline += receiveOnline;
       groupedData.payInCash += payInCash;
       groupedData.payInOnline += payInOnline;
-      
+
       if (isProjectClosed) {
         groupedData.totalProjectClose += 1;
       }
@@ -306,9 +315,9 @@ export async function GET() {
     for (const expense of storeExpenses) {
       const { amount, transactionDate, userId } = expense;
       const store = userStoreMap.get(userId);
-      
+
       if (!store) continue;
-      
+
       // Get keys for data grouping
       const date = new Date(transactionDate);
       const yearKey = format(date, "yyyy");
@@ -317,41 +326,41 @@ export async function GET() {
       const finYearKey = getFinYear(date);
       const quarter = getQuarter(date);
       const quarterKey = `Q${quarter}-${yearKey}`;
-      
+
       // Update total expenses
       groupedData.totalExpenses += amount;
-      
+
       // Update expenses in monthly, yearly, and financial year data
       if (groupedData.monthWiseRevenue[monthYearKey]) {
         groupedData.monthWiseRevenue[monthYearKey].totalExpenses += amount;
       }
-      
+
       if (groupedData.yearWiseRevenue[yearKey]) {
         groupedData.yearWiseRevenue[yearKey].totalExpenses += amount;
       }
-      
+
       if (groupedData.finYearWiseRevenue[finYearKey]) {
         groupedData.finYearWiseRevenue[finYearKey].totalExpenses += amount;
       }
-      
+
       // Update store expenses
       if (groupedData.storeData[store]) {
         const storeRef = groupedData.storeData[store];
         storeRef.totalExpenses += amount;
-        
+
         // Update store monthly, quarterly, yearly and financial year expenses
         if (storeRef.monthly[`${monthName}-${yearKey}`]) {
           storeRef.monthly[`${monthName}-${yearKey}`].totalExpenses += amount;
         }
-        
+
         if (storeRef.quarterly[quarterKey]) {
           storeRef.quarterly[quarterKey].totalExpenses += amount;
         }
-        
+
         if (storeRef.yearly[yearKey]) {
           storeRef.yearly[yearKey].totalExpenses += amount;
         }
-        
+
         if (storeRef.financialYear[finYearKey]) {
           storeRef.financialYear[finYearKey].totalExpenses += amount;
         }
