@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import Link from "next/link";
 
 interface Vendor {
   id: number;
@@ -76,7 +77,11 @@ const AssignedLeads: React.FC<AssignedLeadsProps> = ({ leads, vendor }) => {
 
                   return (
                     <TableRow key={lead.id}>
-                      <TableCell className="p-4">{lead.lead_id}</TableCell>
+                      <TableCell className="p-4">
+                        <Link href={`/tsmgowp/lead/${lead.lead_id}`}>
+                          {lead.lead_id}{" "}
+                        </Link>
+                      </TableCell>
                       <TableCell className="p-4">{lead.customerName}</TableCell>
                       <TableCell className="p-4">{lead.store}</TableCell>
                       <TableCell className="p-4">
