@@ -750,35 +750,37 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
                 {/* total expenses */}
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Total Expenses
-                    </CardTitle>
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      ₹
-                      {formatNumber(
-                        timeframe === "financial"
-                          ? (selectedFinYearData?.totalVendorPayments || 0) +
-                              (selectedFinYearData?.totalExpenses || 0)
-                          : filteredData.reduce(
-                              (acc, item) =>
-                                acc +
-                                (item.totalVendorPayments || 0) +
-                                (item.totalExpenses || 0),
-                              0
-                            )
-                      )}
-                    </div>
+                {activeTab === "handover" && (
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Total Expenses
+                      </CardTitle>
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        ₹
+                        {formatNumber(
+                          timeframe === "financial"
+                            ? (selectedFinYearData?.totalVendorPayments || 0) +
+                                (selectedFinYearData?.totalExpenses || 0)
+                            : filteredData.reduce(
+                                (acc, item) =>
+                                  acc +
+                                  (item.totalVendorPayments || 0) +
+                                  (item.totalExpenses || 0),
+                                0
+                              )
+                        )}
+                      </div>
 
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Your total expenses
-                    </p>
-                  </CardContent>
-                </Card>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Your total expenses
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
                 {/* Total Profit - shown in both tabs */}
                 {activeTab === "handover" && (
                   <Card>
@@ -876,55 +878,82 @@ export default function Dashboard() {
                     </CardContent>
                   </Card>
                 )}
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Vendor Payments
-                    </CardTitle>
-                    <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      ₹
-                      {formatNumber(
-                        timeframe === "financial"
-                          ? selectedFinYearData?.totalVendorPayments || 0
+                {activeTab === "ongoing" && (
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Ongoing Projects
+                      </CardTitle>
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {timeframe === "financial"
+                          ? selectedFinYearData?.totalProjects || 0
                           : filteredData.reduce(
-                              (acc, item) =>
-                                acc + (item.totalVendorPayments || 0),
+                              (acc, item) => acc + (item.totalProjects || 0),
                               0
-                            )
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Total payments to vendors
-                    </p>
-                  </CardContent>
-                </Card>{" "}
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Total Store Expenses
-                    </CardTitle>
-                    <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      ₹
-                      {formatNumber(
-                        timeframe === "financial"
-                          ? selectedFinYearData?.totalExpenses || 0
-                          : filteredData.reduce(
-                              (acc, item) => acc + (item.totalExpenses || 0),
-                              0
-                            )
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Total Store Expenses
-                    </p>
-                  </CardContent>
-                </Card>
+                            )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Successfully completed projects
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                {activeTab === "handover" && (
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Vendor Payments
+                      </CardTitle>
+                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        ₹
+                        {formatNumber(
+                          timeframe === "financial"
+                            ? selectedFinYearData?.totalVendorPayments || 0
+                            : filteredData.reduce(
+                                (acc, item) =>
+                                  acc + (item.totalVendorPayments || 0),
+                                0
+                              )
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total payments to vendors
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                {activeTab === "handover" && (
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Total Store Expenses
+                      </CardTitle>
+                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        ₹
+                        {formatNumber(
+                          timeframe === "financial"
+                            ? selectedFinYearData?.totalExpenses || 0
+                            : filteredData.reduce(
+                                (acc, item) => acc + (item.totalExpenses || 0),
+                                0
+                              )
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total Store Expenses
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
 
               {/* Payment methods - only shown in ongoing tab */}

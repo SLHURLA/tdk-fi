@@ -30,6 +30,7 @@ const SignIn = () => {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(""); // Fixed: Proper useState implementation
   const form = useForm({
     resolver: zodResolver(SignInSchema),
     defaultValues: {
@@ -40,6 +41,8 @@ const SignIn = () => {
 
   const onSubmit = async (values: z.infer<typeof SignInSchema>) => {
     setIsLoading(true);
+    setError(""); // Clear previous errors
+
     try {
       const signInData = await signIn("credentials", {
         email: values.email,
@@ -47,24 +50,36 @@ const SignIn = () => {
         redirect: false,
       });
 
-      if (!signInData || signInData.error) {
+      if (signInData?.error) {
+        setError(
+          signInData.error === "CredentialsSignin"
+            ? "Wrong Credentials"
+            : signInData.error
+        );
         toast({
           description: (
             <span className="flex items-center gap-2">
-              <CircleAlert /> {signInData?.error || "Wrong Credentials!!!"}
+              <CircleAlert /> {signInData.error}
             </span>
           ),
         });
         return;
       }
 
-      router.push("/");
+      if (signInData?.ok) {
+        router.push("/");
+      }
     } catch (error) {
       console.error("Sign-in error:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred!";
+      setError(errorMessage);
       toast({
         description: (
           <span className="flex items-center gap-2">
-            <CircleAlert /> An unexpected error occurred!
+            <CircleAlert /> {errorMessage}
           </span>
         ),
       });
@@ -83,6 +98,12 @@ const SignIn = () => {
           <p className="text-sm text-center text-[#737373]">
             Enter your email and password to login.
           </p>
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm flex items-center gap-2">
+              <CircleAlert size={16} /> {error}
+            </div>
+          )}
 
           <div className="space-y-2">
             <div className="">
@@ -122,21 +143,9 @@ const SignIn = () => {
             </div>
 
             <Button className="w-full mt-4" type="submit" disabled={isLoading}>
-              {isLoading ? "Signing In" : "SignIn"}
+              {isLoading ? "Signing In" : "Sign In"}
             </Button>
           </div>
-
-          {/* <div className="flex items-center gap-2 my-1">
-            <hr className="flex-1 border-gray-300" />
-            <span className="text-sm text-gray-600">Or</span>
-            <hr className="flex-1 border-gray-300" />
-          </div> */}
-
-          {/* <p className="text-center text-sm text-gray-600">
-            <Link href="/otp-signin" className="text-blue-500 hover:underline">
-              Login using OTP
-            </Link>
-          </p> */}
 
           <div className="flex items-center gap-2 my-1">
             <hr className="flex-1 border-gray-300" />

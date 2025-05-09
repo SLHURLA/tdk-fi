@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     ];
 
     const furnitureVendors = [
-      "Factory Alea",
+      "Alea Factory",
       "Installation Partner",
       "Architect Commission",
       "Staff Incentive",
