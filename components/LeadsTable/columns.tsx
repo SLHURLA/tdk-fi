@@ -200,7 +200,7 @@ const columns: ColumnDef<Lead>[] = [
     },
   },
 ];
-
+// this is for the colums section 
 // Function to dynamically filter columns based on pathname
 export const getColumns = () => {
   const pathname = usePathname(); // Get current route in Next.js
