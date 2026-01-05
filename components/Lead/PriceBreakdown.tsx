@@ -120,7 +120,7 @@ const PriceBreakdown = ({
         setGstPercentage("");
       }
     }
-  }, [totalAmount, gstPercentage, gstAmount, lastEditedGstField]); [web:42][web:55]
+  }, [totalAmount, gstPercentage, gstAmount, lastEditedGstField]); 
 
   const handleTotalChange = (value: number | "") => {
     setTotalAmount(value);
