@@ -72,7 +72,7 @@ export function DataTable<TData, TValue>({
     pathname === "/tsmgowp/leads/processing" ? "INPROGRESS" : ""
   );
 
-  // Extract unique statuses
+  // Extract unique statuses for the dropdown
   const statuses = React.useMemo(() => {
     const uniqueStatuses = new Set<string>();
     data.forEach((item: any) => {
@@ -81,11 +81,10 @@ export function DataTable<TData, TValue>({
     return Array.from(uniqueStatuses);
   }, [data]);
 
-  // CORE LOGIC: Filtered Data based on user input
+  // Logic: Filtered Data based on user input
   const filteredData = React.useMemo(() => {
     let filtered = [...data];
 
-    // Date Range Filter
     if (dateRange?.from || dateRange?.to) {
       filtered = filtered.filter((item: any) => {
         const createdAt = new Date(item.createdAt);
@@ -96,7 +95,6 @@ export function DataTable<TData, TValue>({
       });
     }
 
-    // Global Search Filter
     if (globalFilter) {
       const searchTerm = globalFilter.toLowerCase();
       filtered = filtered.filter((item: any) => {
@@ -106,7 +104,6 @@ export function DataTable<TData, TValue>({
       });
     }
 
-    // Status Filter
     if (statusFilter && statusFilter !== "status") {
       filtered = filtered.filter((item: any) => item.status === statusFilter);
     }
@@ -114,7 +111,7 @@ export function DataTable<TData, TValue>({
     return filtered;
   }, [data, dateRange, globalFilter, statusFilter]);
 
-  // STATS CALCULATION: Recalculates every time filteredData changes
+  // Stats for the Dark Cards
   const stats = React.useMemo(() => {
     return {
       all: filteredData.length,
@@ -136,11 +133,7 @@ export function DataTable<TData, TValue>({
   });
 
   const exportToExcel = () => {
-    if (filteredData.length === 0) {
-      alert("No data to export");
-      return;
-    }
-    // (CSV Export logic remains the same as provided in your snippet)
+    if (filteredData.length === 0) return;
     try {
       const firstItem = filteredData[0];
       const allKeys = Object.keys(firstItem || {}).filter((key) => key !== "user" && key !== "_count");
@@ -164,119 +157,123 @@ export function DataTable<TData, TValue>({
         return [...rowData, day, month, year, fullDate];
       });
       const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
-      const BOM = "\uFEFF";
-      const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
-      const url = URL.createObjectURL(blob);
-      let filename = `leads_export_${format(new Date(), "yyyy-MM-dd")}.csv`;
-      link.setAttribute("href", url);
-      link.setAttribute("download", filename);
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute("download", `leads_export_${format(new Date(), "yyyy-MM-dd")}.csv`);
       link.click();
     } catch (e) { console.error(e); }
   };
 
-  const handleStatusChange = (value: string) => {
-    setStatusFilter(value === "status" ? "" : value);
-  };
-
-  const handleDateSelect = (range: DateRange | undefined) => {
-    setDateRange(range);
-    if (range?.from && range.to) setIsDatePopoverOpen(false);
-  };
-
   return (
-    <div className="space-y-6">
-      {/* --- DYNAMIC STATS SECTION --- */}
+    <div className="space-y-6 text-zinc-100 p-2">
+      
+      {/* --- STATS SECTION (DARK THEME) --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-l-4 border-l-slate-500 shadow-sm">
-          <CardContent className="flex items-center p-4">
-            <div className="bg-slate-100 p-3 rounded-full mr-4">
-              <Users className="h-5 w-5 text-slate-600" />
+        <Card className="bg-zinc-900 border-zinc-800 border-l-4 border-l-zinc-500 shadow-lg">
+          <CardContent className="flex items-center p-5">
+            <div className="bg-zinc-800 p-3 rounded-full mr-4">
+              <Users className="h-5 w-5 text-zinc-400" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">All (Filtered)</p>
+              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-tighter">Total Results</p>
               <h3 className="text-2xl font-bold">{stats.all}</h3>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-blue-500 shadow-sm">
-          <CardContent className="flex items-center p-4">
-            <div className="bg-blue-100 p-3 rounded-full mr-4 text-blue-600">
-              <Sparkles className="h-5 w-5" />
+        <Card className="bg-zinc-900 border-zinc-800 border-l-4 border-l-blue-600 shadow-lg">
+          <CardContent className="flex items-center p-5">
+            <div className="bg-blue-900/20 p-3 rounded-full mr-4">
+              <Sparkles className="h-5 w-5 text-blue-500" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Fresh (Filtered)</p>
-              <h3 className="text-2xl font-bold text-blue-700">{stats.fresh}</h3>
+              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-tighter">Fresh Leads</p>
+              <h3 className="text-2xl font-bold text-blue-500">{stats.fresh}</h3>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-green-500 shadow-sm">
-          <CardContent className="flex items-center p-4">
-            <div className="bg-green-100 p-3 rounded-full mr-4 text-green-600">
-              <Activity className="h-5 w-5" />
+        <Card className="bg-zinc-900 border-zinc-800 border-l-4 border-l-emerald-600 shadow-lg">
+          <CardContent className="flex items-center p-5">
+            <div className="bg-emerald-900/20 p-3 rounded-full mr-4">
+              <Activity className="h-5 w-5 text-emerald-500" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Live (Filtered)</p>
-              <h3 className="text-2xl font-bold text-green-700">{stats.live}</h3>
+              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-tighter">Live Leads</p>
+              <h3 className="text-2xl font-bold text-emerald-500">{stats.live}</h3>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* --- FILTERS SECTION --- */}
-      <div className="flex items-center py-4 gap-4 flex-wrap bg-white p-4 rounded-lg border shadow-sm">
-        <Button variant="outline" onClick={exportToExcel} className="flex items-center gap-2">
-          <Download className="h-4 w-4" /> Export CSV
+      {/* --- FILTERS BAR (DARK THEME) --- */}
+      <div className="flex items-center py-4 gap-4 flex-wrap bg-zinc-900 p-4 rounded-xl border border-zinc-800 shadow-md">
+        <Button 
+          variant="outline" 
+          onClick={exportToExcel} 
+          className="bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 hover:text-white"
+        >
+          <Download className="h-4 w-4 mr-2" /> Export
         </Button>
 
         <div className="relative max-w-xs flex-1">
-          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
           <Input
             placeholder="Search leads..."
             value={globalFilter}
-            onChange={(event) => setGlobalFilter(event.target.value)}
-            className="pl-8"
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="pl-10 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 focus-visible:ring-zinc-700"
           />
         </div>
 
-        <Select value={statusFilter || "status"} onValueChange={handleStatusChange}>
-          <SelectTrigger className="w-[180px]">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              <SelectValue placeholder="Status" />
-            </div>
+        <Select value={statusFilter || "status"} onValueChange={(v) => setStatusFilter(v === "status" ? "" : v)}>
+          <SelectTrigger className="w-[180px] bg-zinc-800 border-zinc-700 text-zinc-200">
+            <Filter className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="Status" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-200">
             <SelectItem value="status">All Statuses</SelectItem>
-            {statuses.map((status) => (
-              <SelectItem key={status} value={status}>{status}</SelectItem>
+            {statuses.map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
         <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}>
           <PopoverTrigger asChild>
-            <Button variant={"outline"} className={cn("w-[300px] justify-start text-left font-normal", !dateRange && "text-muted-foreground")}>
+            <Button 
+              variant="outline" 
+              className={cn(
+                "w-[280px] justify-start text-left font-normal bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700",
+                !dateRange && "text-zinc-500"
+              )}
+            >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {dateRange?.from ? (dateRange.to ? `${format(dateRange.from, "LLL dd, y")} - ${format(dateRange.to, "LLL dd, y")}` : format(dateRange.from, "LLL dd, y")) : "Filter by Date Range"}
+              {dateRange?.from ? (
+                dateRange.to ? `${format(dateRange.from, "PP")} - ${format(dateRange.to, "PP")}` : format(dateRange.from, "PP")
+              ) : "Filter by date"}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="range" selected={dateRange} onSelect={handleDateSelect} numberOfMonths={2} />
+          <PopoverContent className="w-auto p-0 bg-zinc-900 border-zinc-800" align="start">
+            <Calendar 
+              mode="range" 
+              selected={dateRange} 
+              onSelect={(r) => { setDateRange(r); if (r?.from && r?.to) setIsDatePopoverOpen(false); }} 
+              numberOfMonths={2} 
+            />
           </PopoverContent>
         </Popover>
       </div>
 
-      {/* --- TABLE SECTION --- */}
-      <div className="rounded-md border bg-white shadow-sm overflow-hidden">
+      {/* --- DATA TABLE (DARK THEME) --- */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden">
         <Table>
-          <TableHeader className="bg-slate-50">
+          <TableHeader className="bg-zinc-900/50">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="border-zinc-800 hover:bg-transparent">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead key={header.id} className="text-zinc-400 font-bold h-12">
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
@@ -286,9 +283,9 @@ export function DataTable<TData, TValue>({
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} className="border-zinc-800 hover:bg-zinc-900/50 transition-colors">
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="p-4">
+                    <TableCell key={cell.id} className="p-4 text-zinc-300">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -296,8 +293,8 @@ export function DataTable<TData, TValue>({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                  No customers match your current filters.
+                <TableCell colSpan={columns.length} className="h-32 text-center text-zinc-600">
+                  No data found for the selected filters.
                 </TableCell>
               </TableRow>
             )}
@@ -305,14 +302,30 @@ export function DataTable<TData, TValue>({
         </Table>
       </div>
 
-      {/* --- PAGINATION SECTION --- */}
-      <div className="flex items-center justify-between py-4">
-        <div className="text-sm text-muted-foreground">
-          Showing <strong>{table.getRowModel().rows.length}</strong> customers in this view
+      {/* --- PAGINATION (DARK THEME) --- */}
+      <div className="flex items-center justify-between py-2 px-2">
+        <div className="text-sm text-zinc-500">
+          Showing <span className="text-zinc-200 font-medium">{table.getRowModel().rows.length}</span> results
         </div>
-        <div className="space-x-2">
-          <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Previous</Button>
-          <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Next</Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => table.previousPage()} 
+            disabled={!table.getCanPreviousPage()}
+            className="bg-zinc-900 border-zinc-800 text-zinc-300 disabled:opacity-20 hover:bg-zinc-800"
+          >
+            Previous
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => table.nextPage()} 
+            disabled={!table.getCanNextPage()}
+            className="bg-zinc-900 border-zinc-800 text-zinc-300 disabled:opacity-20 hover:bg-zinc-800"
+          >
+            Next
+          </Button>
         </div>
       </div>
     </div>
