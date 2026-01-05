@@ -72,7 +72,6 @@ export function DataTable<TData, TValue>({
     pathname === "/tsmgowp/leads/processing" ? "INPROGRESS" : ""
   );
 
-  // Extract unique statuses for the dropdown
   const statuses = React.useMemo(() => {
     const uniqueStatuses = new Set<string>();
     data.forEach((item: any) => {
@@ -81,7 +80,6 @@ export function DataTable<TData, TValue>({
     return Array.from(uniqueStatuses);
   }, [data]);
 
-  // Logic: Filtered Data based on user input
   const filteredData = React.useMemo(() => {
     let filtered = [...data];
 
@@ -111,7 +109,6 @@ export function DataTable<TData, TValue>({
     return filtered;
   }, [data, dateRange, globalFilter, statusFilter]);
 
-  // Stats for the Dark Cards
   const stats = React.useMemo(() => {
     return {
       all: filteredData.length,
@@ -166,9 +163,9 @@ export function DataTable<TData, TValue>({
   };
 
   return (
-    <div className="space-y-6 text-zinc-100 p-2">
+    <div className="space-y-6 text-zinc-100 p-2 bg-black">
       
-      {/* --- STATS SECTION (DARK THEME) --- */}
+      {/* --- STATS SECTION --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-zinc-900 border-zinc-800 border-l-4 border-l-zinc-500 shadow-lg">
           <CardContent className="flex items-center p-5">
@@ -176,7 +173,7 @@ export function DataTable<TData, TValue>({
               <Users className="h-5 w-5 text-zinc-400" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-tighter">Total Results</p>
+              <p className="text-xs font-semibold text-zinc-500 uppercase">Total Results</p>
               <h3 className="text-2xl font-bold">{stats.all}</h3>
             </div>
           </CardContent>
@@ -188,7 +185,7 @@ export function DataTable<TData, TValue>({
               <Sparkles className="h-5 w-5 text-blue-500" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-tighter">Fresh Leads</p>
+              <p className="text-xs font-semibold text-zinc-500 uppercase">Fresh Leads</p>
               <h3 className="text-2xl font-bold text-blue-500">{stats.fresh}</h3>
             </div>
           </CardContent>
@@ -200,19 +197,19 @@ export function DataTable<TData, TValue>({
               <Activity className="h-5 w-5 text-emerald-500" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-tighter">Live Leads</p>
+              <p className="text-xs font-semibold text-zinc-500 uppercase">Live Leads</p>
               <h3 className="text-2xl font-bold text-emerald-500">{stats.live}</h3>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* --- FILTERS BAR (DARK THEME) --- */}
+      {/* --- FILTERS BAR --- */}
       <div className="flex items-center py-4 gap-4 flex-wrap bg-zinc-900 p-4 rounded-xl border border-zinc-800 shadow-md">
         <Button 
           variant="outline" 
           onClick={exportToExcel} 
-          className="bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 hover:text-white"
+          className="bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700"
         >
           <Download className="h-4 w-4 mr-2" /> Export
         </Button>
@@ -223,7 +220,7 @@ export function DataTable<TData, TValue>({
             placeholder="Search leads..."
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            className="pl-10 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 focus-visible:ring-zinc-700"
+            className="pl-10 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
           />
         </div>
 
@@ -245,7 +242,7 @@ export function DataTable<TData, TValue>({
             <Button 
               variant="outline" 
               className={cn(
-                "w-[280px] justify-start text-left font-normal bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700",
+                "w-[280px] justify-start text-left bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700",
                 !dateRange && "text-zinc-500"
               )}
             >
@@ -266,34 +263,37 @@ export function DataTable<TData, TValue>({
         </Popover>
       </div>
 
-      {/* --- DATA TABLE (DARK THEME) --- */}
+      {/* --- DATA TABLE SECTION (DARK THEME FIXED) --- */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden">
-        <Table>
-          <TableHeader className="bg-zinc-900/50">
+        <Table className="bg-zinc-950">
+          <TableHeader className="bg-zinc-900/50 border-b border-zinc-800">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="border-zinc-800 hover:bg-transparent">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="text-zinc-400 font-bold h-12">
+                  <TableHead key={header.id} className="text-zinc-400 font-bold h-12 bg-transparent">
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody>
+          <TableBody className="bg-zinc-950">
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className="border-zinc-800 hover:bg-zinc-900/50 transition-colors">
+                <TableRow 
+                  key={row.id} 
+                  className="border-zinc-800 bg-zinc-950 hover:bg-zinc-900/50 transition-colors"
+                >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="p-4 text-zinc-300">
+                    <TableCell key={cell.id} className="p-4 text-zinc-300 border-zinc-800">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-32 text-center text-zinc-600">
+              <TableRow className="bg-zinc-950 border-zinc-800">
+                <TableCell colSpan={columns.length} className="h-32 text-center text-zinc-600 bg-zinc-950">
                   No data found for the selected filters.
                 </TableCell>
               </TableRow>
@@ -302,8 +302,8 @@ export function DataTable<TData, TValue>({
         </Table>
       </div>
 
-      {/* --- PAGINATION (DARK THEME) --- */}
-      <div className="flex items-center justify-between py-2 px-2">
+      {/* --- PAGINATION SECTION --- */}
+      <div className="flex items-center justify-between py-2 px-2 bg-black">
         <div className="text-sm text-zinc-500">
           Showing <span className="text-zinc-200 font-medium">{table.getRowModel().rows.length}</span> results
         </div>
@@ -313,7 +313,7 @@ export function DataTable<TData, TValue>({
             size="sm" 
             onClick={() => table.previousPage()} 
             disabled={!table.getCanPreviousPage()}
-            className="bg-zinc-900 border-zinc-800 text-zinc-300 disabled:opacity-20 hover:bg-zinc-800"
+            className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800"
           >
             Previous
           </Button>
@@ -322,7 +322,7 @@ export function DataTable<TData, TValue>({
             size="sm" 
             onClick={() => table.nextPage()} 
             disabled={!table.getCanNextPage()}
-            className="bg-zinc-900 border-zinc-800 text-zinc-300 disabled:opacity-20 hover:bg-zinc-800"
+            className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800"
           >
             Next
           </Button>
