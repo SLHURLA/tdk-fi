@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 export type Lead = {
   id: number;
@@ -41,7 +42,7 @@ const columns: ColumnDef<Lead>[] = [
     header: ({ column }) => (
       <Button
         variant="ghost"
-        className="justify-start w-full"
+        className="justify-start w-full text-zinc-400 hover:text-white hover:bg-zinc-800/50 p-0 px-2"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
         Customer ID.
@@ -55,7 +56,7 @@ const columns: ColumnDef<Lead>[] = [
             ? `/tsmgowp/lead/${row.original.lead_id}`
             : `/tsmgowp/lead/init/${row.original.lead_id}`
         }
-        className="hover:underline text-left block"
+        className="hover:underline text-left block text-zinc-300 font-medium"
       >
         {row.original.lead_id}
       </Link>
@@ -64,57 +65,51 @@ const columns: ColumnDef<Lead>[] = [
   {
     accessorKey: "store",
     header: () => (
-      <Button variant="ghost" className="justify-start w-full">
-        Store
-      </Button>
+      <span className="text-zinc-400 font-medium text-sm px-2">Store</span>
     ),
+    cell: ({ row }) => <span className="text-zinc-300 px-2">{row.getValue("store")}</span>
   },
   {
     accessorKey: "customerName",
     header: () => (
-      <Button variant="ghost" className="justify-start w-full">
-        Customer Name
-      </Button>
+      <span className="text-zinc-400 font-medium text-sm px-2">Customer Name</span>
     ),
+    cell: ({ row }) => <span className="text-zinc-300 px-2">{row.getValue("customerName")}</span>
   },
   {
     accessorKey: "phoneNo",
     header: () => (
-      <Button variant="ghost" className="justify-start w-full">
-        Phone No.
-      </Button>
+      <span className="text-zinc-400 font-medium text-sm px-2">Phone No.</span>
     ),
+    cell: ({ row }) => <span className="text-zinc-300 px-2">{row.getValue("phoneNo")}</span>
   },
   {
     accessorKey: "contactInfo",
     header: () => (
-      <Button variant="ghost" className="justify-start w-full">
-        Contact Info
-      </Button>
+      <span className="text-zinc-400 font-medium text-sm px-2">Contact Info</span>
     ),
+    cell: ({ row }) => <span className="text-zinc-300 px-2">{row.getValue("contactInfo")}</span>
   },
   {
     accessorKey: "status",
     header: () => (
-      <Button variant="ghost" className="justify-start w-full">
-        Status
-      </Button>
+      <span className="text-zinc-400 font-medium text-sm px-2">Status</span>
     ),
     cell: ({ row }) => {
       const lead = row.original;
       let statusStyle = "";
 
       if (lead.status === "WON")
-        statusStyle = "bg-green-600 text-white px-2 py-1 rounded-md";
+        statusStyle = "bg-green-900/40 text-green-400 border border-green-800/50";
       else if (lead.status === "INPROGRESS")
-        statusStyle = "bg-yellow-600 text-white px-2 py-1 rounded-md";
+        statusStyle = "bg-amber-900/40 text-amber-400 border border-amber-800/50";
       else if (lead.status === "LOST")
-        statusStyle = "bg-red-600 text-white px-2 py-1 rounded-md";
+        statusStyle = "bg-red-900/40 text-red-400 border border-red-800/50";
       else if (lead.status === "CLOSED")
-        statusStyle = "bg-blue-600 text-white px-2 py-1 rounded-md";
+        statusStyle = "bg-blue-900/40 text-blue-400 border border-blue-800/50";
 
       return (
-        <span className={`text-center text-xs block ${statusStyle}`}>
+        <span className={cn("text-center text-[10px] font-bold uppercase tracking-wider block px-2 py-1 rounded-md", statusStyle)}>
           {lead.status === "WON" ? "NOT_INITIALIZED" : lead.status}
         </span>
       );
@@ -122,11 +117,8 @@ const columns: ColumnDef<Lead>[] = [
   },
   {
     id: "paymentPercentage",
-
     header: () => (
-      <Button variant="ghost" className="justify-start w-full">
-        Payment %{/* <ArrowUpDown className="ml-2 h-4 w-4" /> */}
-      </Button>
+      <span className="text-zinc-400 font-medium text-sm px-2">Payment %</span>
     ),
     cell: ({ row }) => {
       const lead = row.original;
@@ -140,33 +132,25 @@ const columns: ColumnDef<Lead>[] = [
       let badgeColor = "";
 
       if (percentage >= 100) {
-        progressBarColor = "bg-green-600";
-        badgeColor = "bg-green-600 text-white";
-      } else if (percentage >= 75) {
-        progressBarColor = "bg-emerald-600";
-        badgeColor = "bg-emerald-600 text-white";
+        progressBarColor = "bg-green-500";
+        badgeColor = "text-green-400";
       } else if (percentage >= 50) {
-        progressBarColor = "bg-yellow-600";
-        badgeColor = "bg-yellow-600 text-white";
-      } else if (percentage >= 25) {
-        progressBarColor = "bg-orange-600";
-        badgeColor = "bg-orange-600 text-white";
+        progressBarColor = "bg-amber-500";
+        badgeColor = "text-amber-400";
       } else {
-        progressBarColor = "bg-red-600";
-        badgeColor = "bg-red-600 text-white";
+        progressBarColor = "bg-red-500";
+        badgeColor = "text-red-400";
       }
 
       return (
-        <div className="flex items-center w-full">
-          <div className="w-20 bg-gray-300 rounded-full h-2.5 mr-2">
+        <div className="flex items-center w-full px-2">
+          <div className="flex-1 bg-zinc-800 rounded-full h-1.5 mr-3 max-w-[100px]">
             <div
-              className={`h-2.5 rounded-full ${progressBarColor}`}
+              className={cn("h-1.5 rounded-full transition-all duration-500", progressBarColor)}
               style={{ width: `${Math.min(percentage, 100)}%` }}
             ></div>
           </div>
-          <span
-            className={`px-2 py-1 rounded-md text-xs font-medium ${badgeColor}`}
-          >
+          <span className={cn("text-[10px] font-bold min-w-[30px]", badgeColor)}>
             {percentage}%
           </span>
         </div>
@@ -180,33 +164,34 @@ const columns: ColumnDef<Lead>[] = [
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
+            <Button variant="ghost" className="h-8 w-8 p-0 text-zinc-400 hover:text-white hover:bg-zinc-800">
               <span className="sr-only">Open menu</span>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800 text-zinc-300">
+            <DropdownMenuLabel className="text-zinc-500">Actions</DropdownMenuLabel>
             <DropdownMenuItem
+              className="hover:bg-zinc-800 focus:bg-zinc-800 cursor-pointer"
               onClick={() => navigator.clipboard.writeText(lead.phoneNo)}
             >
               Copy Contact
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>View Lead</DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-zinc-800" />
+            <DropdownMenuItem className="hover:bg-zinc-800 focus:bg-zinc-800 cursor-pointer">
+              View Lead
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );
     },
   },
 ];
-// this is for the colums section 
-// Function to dynamically filter columns based on pathname
+
 export const getColumns = () => {
-  const pathname = usePathname(); // Get current route in Next.js
+  const pathname = usePathname();
 
   return columns.filter((column) => {
-    // Remove payment column if the path is "/tsmgowp/leads/all"
     if (
       column.id === "paymentPercentage" &&
       pathname === "/tsmgowp/leads/all"
