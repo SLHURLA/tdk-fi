@@ -96,20 +96,32 @@ const PriceBreakdown = ({
   const currentParticulars = activeTab === "main" ? mainParticulars : additionalParticulars;
 
   // STRICT CALCULATION LOGIC: GST = (Percentage * Bank Payment) / 100
+  // STRICT CALCULATION LOGIC: GST is calculated ON TOP of the Bank Payment
   useEffect(() => {
   const bank = Number(bankPayments) || 0;
-  const pct = Number(gstPercentage) || 0;
 
+  // 1. Calculate Amount from Percentage
   if (lastEditedGstField === "percentage") {
-    // Formula: (Bank Amount * GST%) / 100
+    // Default to 18 if empty
+    const pct = (gstPercentage === "" || isNaN(Number(gstPercentage))) ? 18 : Number(gstPercentage);
+    
+    // Formula for Exclusive GST: (Base Amount * GST Rate) / 100
     const calculatedGst = (bank * pct) / 100;
+    
+    setGstPercentage(pct); 
     setGstAmount(Number(calculatedGst.toFixed(2)));
-  } 
+  }
+
+  // 2. Calculate Percentage from Amount (Reverse)
   else if (lastEditedGstField === "amount") {
-    // Formula: (GST Amount / Bank Amount) * 100
+    const amt = Number(gstAmount) || 0;
+
     if (bank > 0) {
-      const calculatedPct = (Number(gstAmount) / bank) * 100;
+      // Formula: (Tax / Base) * 100
+      const calculatedPct = (amt / bank) * 100;
       setGstPercentage(Number(calculatedPct.toFixed(2)));
+    } else {
+      setGstPercentage(18);
     }
   }
 }, [gstPercentage, gstAmount, bankPayments, lastEditedGstField]);
