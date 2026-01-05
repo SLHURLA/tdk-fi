@@ -75,7 +75,7 @@ const PriceBreakdown = ({
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"main" | "additional">("main");
 
-  // Form state with proper types for empty string handling
+  // Form state
   const [areaType, setAreaType] = useState("");
   const [totalAmount, setTotalAmount] = useState<number | "">("");
   const [bankPayments, setBankPayments] = useState<number | "">("");
@@ -97,27 +97,30 @@ const PriceBreakdown = ({
   const currentParticulars =
     activeTab === "main" ? mainParticulars : additionalParticulars;
 
-  // EXCLUSIVE GST CALCULATION: GST = (Bank Payment * GST%) / 100
+  // GST CALCULATION ON TOTAL: GST = (Total * GST%) / 100
   useEffect(() => {
-    const bank = Number(bankPayments) || 0;
+    const total = Number(totalAmount) || 0;
 
-    // Percentage is the driver
     if (lastEditedGstField === "percentage") {
       const pct = Number(gstPercentage) || 0;
-      // Formula: (Bank Amount * GST Rate) / 100
-      const calculatedGst = (bank * pct) / 100;
-      setGstAmount(calculatedGst > 0 ? Number(calculatedGst.toFixed(2)) : "");
-    }
-    // Amount is the driver (Manual entry)
-    else if (lastEditedGstField === "amount") {
+
+      if (total > 0 && pct > 0) {
+        const calculatedGst = (total * pct) / 100;
+        setGstAmount(Number(calculatedGst.toFixed(2)));
+      } else {
+        setGstAmount("");
+      }
+    } else if (lastEditedGstField === "amount") {
       const amt = Number(gstAmount) || 0;
-      if (bank > 0) {
-        // Reverse Formula: (GST Amount / Bank) * 100
-        const calculatedPct = (amt / bank) * 100;
-        setGstPercentage(calculatedPct > 0 ? Number(calculatedPct.toFixed(2)) : "");
+
+      if (total > 0 && amt > 0) {
+        const calculatedPct = (amt / total) * 100;
+        setGstPercentage(Number(calculatedPct.toFixed(2)));
+      } else {
+        setGstPercentage("");
       }
     }
-  }, [gstPercentage, gstAmount, bankPayments, lastEditedGstField]);
+  }, [totalAmount, gstPercentage, gstAmount, lastEditedGstField]); [web:42][web:55]
 
   const handleTotalChange = (value: number | "") => {
     setTotalAmount(value);
@@ -136,7 +139,9 @@ const PriceBreakdown = ({
     setBankPayments(value);
     if (totalAmount !== "") {
       const remainingCash = Number(totalAmount) - bankVal;
-      setCashPayments(remainingCash >= 0 ? Number(remainingCash.toFixed(2)) : 0);
+      setCashPayments(
+        remainingCash >= 0 ? Number(remainingCash.toFixed(2)) : 0
+      );
     }
     setLastEditedGstField("percentage");
   };
@@ -270,12 +275,14 @@ const PriceBreakdown = ({
     setBankPayments(item.payInOnline || 0);
     setCashPayments(item.payInCash || 0);
     setGstAmount(item.gst || 0);
-    if (item.payInOnline > 0 && item.gst > 0) {
-      const pct = (item.gst / item.payInOnline) * 100;
+
+    if (total > 0 && item.gst > 0) {
+      const pct = (item.gst / total) * 100;
       setGstPercentage(Number(pct.toFixed(2)));
     } else {
       setGstPercentage(10);
     }
+
     setBrand(item.brand || "");
     setModel(item.model || "");
     setRemark(item.remark || "");
@@ -480,6 +487,7 @@ const PriceBreakdown = ({
           </DialogContent>
         </Dialog>
       </CardHeader>
+
       <CardContent>
         <Table>
           <TableHeader>
@@ -622,17 +630,26 @@ const PriceBreakdown = ({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Brand</Label>
-                <Input value={brand} onChange={(e) => setBrand(e.target.value)} />
+                <Input
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                />
               </div>
               <div>
                 <Label>Model</Label>
-                <Input value={model} onChange={(e) => setModel(e.target.value)} />
+                <Input
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                />
               </div>
             </div>
 
             <div>
               <Label>Remark</Label>
-              <Input value={remark} onChange={(e) => setRemark(e.target.value)} />
+              <Input
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+              />
             </div>
           </div>
           <DialogFooter>
