@@ -108,7 +108,7 @@ const PriceBreakdown = ({
     if (lastEditedGstField === "percentage" && gstPercentage !== "" && bankPayments !== "") {
       // Calculate GST amount from percentage based ONLY on Bank Payments
       // Formula: (Bank Amount * GST%) / (100 + GST%)
-      const calculatedGstAmount = (Number(bankPayments) * Number(gstPercentage)) / (100 + Number(gstPercentage));
+      const calculatedGstAmount = (Number(bankPayments) * Number(gstPercentage)) / (100);
       setGstAmount(Number(calculatedGstAmount.toFixed(2)));
     } else if (lastEditedGstField === "amount" && gstAmount !== "" && bankPayments !== "") {
       // Calculate GST percentage from amount based ONLY on Bank Payments
