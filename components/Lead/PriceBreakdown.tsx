@@ -96,65 +96,67 @@ const PriceBreakdown = ({
   const currentParticulars = activeTab === "main" ? mainParticulars : additionalParticulars;
 
   // STRICT CALCULATION LOGIC: GST = (Percentage * Bank Payment) / 100
-  // STRICT CALCULATION LOGIC: GST is calculated ON TOP of the Bank Payment
-  useEffect(() => {
-  const bank = Number(bankPayments) || 0;
+  // 1. FIXED CALCULATION LOGIC
+      useEffect(() => {
+        const bank = Number(bankPayments) || 0;
 
-  // 1. Calculate Amount from Percentage
-  if (lastEditedGstField === "percentage") {
-    // Default to 18 if empty
-    const pct = (gstPercentage === "" || isNaN(Number(gstPercentage))) ? 18 : Number(gstPercentage);
-    
-    // Formula for Exclusive GST: (Base Amount * GST Rate) / 100
-    const calculatedGst = (bank * pct) / 100;
-    
-    setGstPercentage(pct); 
-    setGstAmount(Number(calculatedGst.toFixed(2)));
-  }
+        // Percentage is the driver (Standard 18% or user input)
+        if (lastEditedGstField === "percentage") {
+          const pct = (gstPercentage === "" || isNaN(Number(gstPercentage))) ? 18 : Number(gstPercentage);
+          // Formula: (Bank Amount * GST Rate) / 100
+          const calculatedGst = (bank * pct) / 100;
+          
+          setGstAmount(Number(calculatedGst.toFixed(2)));
+        } 
+        // Amount is the driver (Manual entry)
+        else if (lastEditedGstField === "amount") {
+          const amt = Number(gstAmount) || 0;
+          if (bank > 0) {
+            // Reverse Formula: (Tax / Bank) * 100
+            const calculatedPct = (amt / bank) * 100;
+            setGstPercentage(Number(calculatedPct.toFixed(2)));
+          }
+        }
+      }, [gstPercentage, gstAmount, bankPayments, lastEditedGstField]);
 
-  // 2. Calculate Percentage from Amount (Reverse)
-  else if (lastEditedGstField === "amount") {
-    const amt = Number(gstAmount) || 0;
+      // 2. FIXED HANDLERS to prevent value "fighting"
+      const handleTotalChange = (value: number | "") => {
+        setTotalAmount(value);
+        if (value === "") {
+          setBankPayments("");
+          setCashPayments("");
+        } else {
+          // When Total changes, we reset Bank to Total and Cash to 0
+          // This allows the GST to calculate purely off the new Bank value
+          setBankPayments(value);
+          setCashPayments(0);
+          setLastEditedGstField("percentage");
+        }
+      };
 
-    if (bank > 0) {
-      // Formula: (Tax / Base) * 100
-      const calculatedPct = (amt / bank) * 100;
-      setGstPercentage(Number(calculatedPct.toFixed(2)));
-    } else {
-      setGstPercentage(18);
-    }
-  }
-}, [gstPercentage, gstAmount, bankPayments, lastEditedGstField]);
+      const handleBankChange = (value: number | "") => {
+        const bankVal = value === "" ? 0 : Number(value);
+        setBankPayments(value);
+        
+        if (totalAmount !== "") {
+          // Ensure Cash + Bank = Total
+          const remainingCash = Number(totalAmount) - bankVal;
+          setCashPayments(remainingCash >= 0 ? Number(remainingCash.toFixed(2)) : 0);
+        }
+        setLastEditedGstField("percentage");
+      };
 
-
-  const handleTotalChange = (value: number | "") => {
-    setTotalAmount(value);
-    if (value === "") {
-      setBankPayments("");
-      setCashPayments("");
-    } else {
-      setBankPayments(value);
-      setCashPayments(0);
-    }
-  };
-
-  const handleBankChange = (value: number | "") => {
-    setBankPayments(value);
-    if (totalAmount !== "" && value !== "") {
-      const remaining = Number(totalAmount) - Number(value);
-      setCashPayments(remaining >= 0 ? Number(remaining.toFixed(2)) : 0);
-    }
-    setLastEditedGstField("percentage");
-  };
-
-  const handleCashChange = (value: number | "") => {
-    setCashPayments(value);
-    if (totalAmount !== "" && value !== "") {
-      const remaining = Number(totalAmount) - Number(value);
-      setBankPayments(remaining >= 0 ? Number(remaining.toFixed(2)) : 0);
-    }
-    setLastEditedGstField("percentage");
-  };
+      const handleCashChange = (value: number | "") => {
+        const cashVal = value === "" ? 0 : Number(value);
+        setCashPayments(value);
+        
+        if (totalAmount !== "") {
+          // Ensure Bank + Cash = Total
+          const remainingBank = Number(totalAmount) - cashVal;
+          setBankPayments(remainingBank >= 0 ? Number(remainingBank.toFixed(2)) : 0);
+        }
+        setLastEditedGstField("percentage");
+      };
 
   const handleClear = () => {
     setAreaType("");
