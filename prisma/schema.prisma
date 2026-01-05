@@ -41,9 +41,6 @@ model Lead {
   status               LeadStatus        @default(WON)
   userId               Int
   createdAt            DateTime          @default(now())
-  deletedAt            DateTime?         // Add this field for soft delete
-  
-  @@index([deletedAt])                  // Optional: Indexing improves 
   updatedAt            DateTime          @updatedAt
   user                 User              @relation(fields: [userId], references: [id])
   totalProjectCost     Float             @default(0)
