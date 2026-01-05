@@ -122,10 +122,9 @@ const columns: ColumnDef<Lead>[] = [
   },
   {
     id: "paymentPercentage",
-
     header: () => (
       <Button variant="ghost" className="justify-start w-full">
-        Payment %{/* <ArrowUpDown className="ml-2 h-4 w-4" /> */}
+        Payment %
       </Button>
     ),
     cell: ({ row }) => {
@@ -177,6 +176,34 @@ const columns: ColumnDef<Lead>[] = [
     id: "actions",
     cell: ({ row }) => {
       const lead = row.original;
+
+      const onDelete = async () => {
+        const confirmDelete = confirm(
+          "Are you sure you want to delete this uninitialized lead?"
+        );
+        if (!confirmDelete) return;
+
+        try {
+          // Note: Ensure your API route is at /api/deleteLead as per previous setup
+          const response = await fetch("/api/deleteLead", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: lead.id }),
+          });
+
+          if (response.ok) {
+            alert("Lead deleted successfully");
+            window.location.reload(); 
+          } else {
+            const error = await response.text();
+            alert(error || "Failed to delete lead");
+          }
+        } catch (err) {
+          console.error("Delete error:", err);
+          alert("An error occurred while deleting the lead");
+        }
+      };
+
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -193,17 +220,34 @@ const columns: ColumnDef<Lead>[] = [
               Copy Contact
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>View Lead</DropdownMenuItem>
+            <DropdownMenuItem>
+              <Link href={lead.init ? `/tsmgowp/lead/${lead.lead_id}` : `/tsmgowp/lead/init/${lead.lead_id}`}>
+                View Lead
+              </Link>
+            </DropdownMenuItem>
+
+            {/* SOFT DELETE OPTION FOR UNINITIALIZED LEADS */}
+            {!lead.init && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={onDelete}
+                  className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                >
+                  Delete Lead
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       );
     },
   },
 ];
-// this is for the colums section 
+
 // Function to dynamically filter columns based on pathname
 export const getColumns = () => {
-  const pathname = usePathname(); // Get current route in Next.js
+  const pathname = usePathname();
 
   return columns.filter((column) => {
     // Remove payment column if the path is "/tsmgowp/leads/all"
