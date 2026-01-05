@@ -163,73 +163,76 @@ export function DataTable<TData, TValue>({
   };
 
   return (
-    <div className="space-y-6 text-zinc-100 p-2 bg-black">
+    // Replaced hardcoded black with adaptive background and text
+    <div className="space-y-6 p-4 bg-background text-foreground transition-colors">
       
       {/* --- STATS SECTION --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-zinc-900 border-zinc-800 border-l-4 border-l-zinc-500 shadow-lg">
+        <Card className="border-l-4 border-l-muted-foreground shadow-sm">
           <CardContent className="flex items-center p-5">
-            <div className="bg-zinc-800 p-3 rounded-full mr-4">
-              <Users className="h-5 w-5 text-zinc-400" />
+            <div className="bg-muted p-3 rounded-full mr-4">
+              <Users className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-zinc-500 uppercase">Total Results</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase">Total Results</p>
               <h3 className="text-2xl font-bold">{stats.all}</h3>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900 border-zinc-800 border-l-4 border-l-blue-600 shadow-lg">
+        <Card className="border-l-4 border-l-blue-600 shadow-sm">
           <CardContent className="flex items-center p-5">
-            <div className="bg-blue-900/20 p-3 rounded-full mr-4">
-              <Sparkles className="h-5 w-5 text-blue-500" />
+            <div className="bg-blue-100 dark:bg-blue-900/20 p-3 rounded-full mr-4">
+              <Sparkles className="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-zinc-500 uppercase">Fresh Leads</p>
-              <h3 className="text-2xl font-bold text-blue-500">{stats.fresh}</h3>
+              <p className="text-xs font-semibold text-muted-foreground uppercase">Fresh Leads</p>
+              <h3 className="text-2xl font-bold text-blue-600">{stats.fresh}</h3>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900 border-zinc-800 border-l-4 border-l-emerald-600 shadow-lg">
+        <Card className="border-l-4 border-l-emerald-600 shadow-sm">
           <CardContent className="flex items-center p-5">
-            <div className="bg-emerald-900/20 p-3 rounded-full mr-4">
-              <Activity className="h-5 w-5 text-emerald-500" />
+            <div className="bg-emerald-100 dark:bg-emerald-900/20 p-3 rounded-full mr-4">
+              <Activity className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-zinc-500 uppercase">Live Leads</p>
-              <h3 className="text-2xl font-bold text-emerald-500">{stats.live}</h3>
+              <p className="text-xs font-semibold text-muted-foreground uppercase">Live Leads</p>
+              <h3 className="text-2xl font-bold text-emerald-600">{stats.live}</h3>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* --- FILTERS BAR --- */}
-      <div className="flex items-center py-4 gap-4 flex-wrap bg-zinc-900 p-4 rounded-xl border border-zinc-800 shadow-md">
+      <div className="flex items-center py-4 gap-4 flex-wrap bg-card p-4 rounded-xl border shadow-sm transition-colors">
         <Button 
           variant="outline" 
           onClick={exportToExcel} 
-          className="bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700"
+          className="shadow-sm"
         >
           <Download className="h-4 w-4 mr-2" /> Export
         </Button>
 
         <div className="relative max-w-xs flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search leads..."
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            className="pl-10 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+            className="pl-10"
           />
         </div>
 
         <Select value={statusFilter || "status"} onValueChange={(v) => setStatusFilter(v === "status" ? "" : v)}>
-          <SelectTrigger className="w-[180px] bg-zinc-800 border-zinc-700 text-zinc-200">
-            <Filter className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Status" />
+          <SelectTrigger className="w-[180px]">
+            <div className="flex items-center">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Status" />
+            </div>
           </SelectTrigger>
-          <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-200">
+          <SelectContent>
             <SelectItem value="status">All Statuses</SelectItem>
             {statuses.map((s) => (
               <SelectItem key={s} value={s}>{s}</SelectItem>
@@ -242,8 +245,8 @@ export function DataTable<TData, TValue>({
             <Button 
               variant="outline" 
               className={cn(
-                "w-[280px] justify-start text-left bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700",
-                !dateRange && "text-zinc-500"
+                "w-[280px] justify-start text-left font-normal shadow-sm",
+                !dateRange && "text-muted-foreground"
               )}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
@@ -252,7 +255,7 @@ export function DataTable<TData, TValue>({
               ) : "Filter by date"}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0 bg-zinc-900 border-zinc-800" align="start">
+          <PopoverContent className="w-auto p-0" align="start">
             <Calendar 
               mode="range" 
               selected={dateRange} 
@@ -263,37 +266,37 @@ export function DataTable<TData, TValue>({
         </Popover>
       </div>
 
-      {/* --- DATA TABLE SECTION (DARK THEME FIXED) --- */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden">
-        <Table className="bg-zinc-950">
-          <TableHeader className="bg-zinc-900/50 border-b border-zinc-800">
+      {/* --- DATA TABLE SECTION --- */}
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden transition-colors">
+        <Table>
+          <TableHeader className="bg-muted/50">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="border-zinc-800 hover:bg-transparent">
+              <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="text-zinc-400 font-bold h-12 bg-transparent">
+                  <TableHead key={header.id} className="font-bold">
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody className="bg-zinc-950">
+          <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow 
                   key={row.id} 
-                  className="border-zinc-800 bg-zinc-950 hover:bg-zinc-900/50 transition-colors"
+                  className="hover:bg-muted/50 transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="p-4 text-zinc-300 border-zinc-800">
+                    <TableCell key={cell.id} className="p-4">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
-              <TableRow className="bg-zinc-950 border-zinc-800">
-                <TableCell colSpan={columns.length} className="h-32 text-center text-zinc-600 bg-zinc-950">
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-32 text-center text-muted-foreground">
                   No data found for the selected filters.
                 </TableCell>
               </TableRow>
@@ -303,9 +306,9 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* --- PAGINATION SECTION --- */}
-      <div className="flex items-center justify-between py-2 px-2 bg-black">
-        <div className="text-sm text-zinc-500">
-          Showing <span className="text-zinc-200 font-medium">{table.getRowModel().rows.length}</span> results
+      <div className="flex items-center justify-between py-2 px-2">
+        <div className="text-sm text-muted-foreground">
+          Showing <span className="font-medium text-foreground">{table.getRowModel().rows.length}</span> results
         </div>
         <div className="flex gap-2">
           <Button 
@@ -313,7 +316,6 @@ export function DataTable<TData, TValue>({
             size="sm" 
             onClick={() => table.previousPage()} 
             disabled={!table.getCanPreviousPage()}
-            className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800"
           >
             Previous
           </Button>
@@ -322,7 +324,6 @@ export function DataTable<TData, TValue>({
             size="sm" 
             onClick={() => table.nextPage()} 
             disabled={!table.getCanNextPage()}
-            className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800"
           >
             Next
           </Button>
