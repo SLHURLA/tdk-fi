@@ -8,6 +8,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from "@/components/ui/table";
 import { Package, Trash2, PlusCircle, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -75,52 +76,41 @@ const PriceBreakdown = ({
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"main" | "additional">("main");
 
-  // Form state
+  // Form states
   const [areaType, setAreaType] = useState("");
   const [totalAmount, setTotalAmount] = useState<number | "">("");
   const [bankPayments, setBankPayments] = useState<number | "">("");
   const [cashPayments, setCashPayments] = useState<number | "">("");
-  const [gstPercentage, setGstPercentage] = useState<number | "">(10);
+  const [gstPercentage, setGstPercentage] = useState<number | "">(18);
   const [gstAmount, setGstAmount] = useState<number | "">("");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [remark, setRemark] = useState("");
-  const [lastEditedGstField, setLastEditedGstField] = useState<
-    "percentage" | "amount"
-  >("percentage");
+  const [lastEditedGstField, setLastEditedGstField] = useState<"percentage" | "amount">("percentage");
 
   const mainParticulars = Object.values(AreaType).filter(
-    (area) =>
-      !["Counter_top", "Appliances", "Sink", "Installation"].includes(area)
+    (area) => !["Counter_top", "Appliances", "Sink", "Installation"].includes(area)
   );
   const additionalParticulars = Object.values(AdditionalItemsList);
-  const currentParticulars =
-    activeTab === "main" ? mainParticulars : additionalParticulars;
+  const currentParticulars = activeTab === "main" ? mainParticulars : additionalParticulars;
 
-  // GST CALCULATION ON TOTAL: GST = (Total * GST%) / 100
+  // --- CALCULATION LOGIC ---
+  // Calculates GST strictly based on Bank Payment
   useEffect(() => {
-    const total = Number(totalAmount) || 0;
+    const bank = Number(bankPayments) || 0;
 
     if (lastEditedGstField === "percentage") {
-      const pct = Number(gstPercentage) || 0;
-
-      if (total > 0 && pct > 0) {
-        const calculatedGst = (total * pct) / 100;
-        setGstAmount(Number(calculatedGst.toFixed(2)));
-      } else {
-        setGstAmount("");
-      }
+      const pct = (gstPercentage === "" || isNaN(Number(gstPercentage))) ? 18 : Number(gstPercentage);
+      const calculatedGst = (bank * pct) / 100;
+      setGstAmount(calculatedGst > 0 ? Number(calculatedGst.toFixed(2)) : "");
     } else if (lastEditedGstField === "amount") {
       const amt = Number(gstAmount) || 0;
-
-      if (total > 0 && amt > 0) {
-        const calculatedPct = (amt / total) * 100;
+      if (bank > 0 && amt > 0) {
+        const calculatedPct = (amt / bank) * 100;
         setGstPercentage(Number(calculatedPct.toFixed(2)));
-      } else {
-        setGstPercentage("");
       }
     }
-  }, [totalAmount, gstPercentage, gstAmount, lastEditedGstField]); 
+  }, [bankPayments, gstPercentage, gstAmount, lastEditedGstField]);
 
   const handleTotalChange = (value: number | "") => {
     setTotalAmount(value);
@@ -139,9 +129,7 @@ const PriceBreakdown = ({
     setBankPayments(value);
     if (totalAmount !== "") {
       const remainingCash = Number(totalAmount) - bankVal;
-      setCashPayments(
-        remainingCash >= 0 ? Number(remainingCash.toFixed(2)) : 0
-      );
+      setCashPayments(remainingCash >= 0 ? Number(remainingCash.toFixed(2)) : 0);
     }
     setLastEditedGstField("percentage");
   };
@@ -151,9 +139,7 @@ const PriceBreakdown = ({
     setCashPayments(value);
     if (totalAmount !== "") {
       const remainingBank = Number(totalAmount) - cashVal;
-      setBankPayments(
-        remainingBank >= 0 ? Number(remainingBank.toFixed(2)) : 0
-      );
+      setBankPayments(remainingBank >= 0 ? Number(remainingBank.toFixed(2)) : 0);
     }
     setLastEditedGstField("percentage");
   };
@@ -163,7 +149,7 @@ const PriceBreakdown = ({
     setTotalAmount("");
     setBankPayments("");
     setCashPayments("");
-    setGstPercentage(10);
+    setGstPercentage(18);
     setGstAmount("");
     setBrand("");
     setModel("");
@@ -172,6 +158,18 @@ const PriceBreakdown = ({
     setEditingItemId(null);
   };
 
+  // --- TABLE TOTALS ---
+  const totals = priceBreakdown.reduce(
+    (acc, item) => ({
+      total: acc.total + (item.payInOnline + item.payInCash),
+      bank: acc.bank + item.payInOnline,
+      cash: acc.cash + item.payInCash,
+      gst: acc.gst + item.gst,
+    }),
+    { total: 0, bank: 0, cash: 0, gst: 0 }
+  );
+
+  // --- API ACTIONS ---
   const handleDelete = async (itemId: string) => {
     setIsLoading(true);
     try {
@@ -180,59 +178,30 @@ const PriceBreakdown = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itemId, leadId }),
       });
-
-      if (!response.ok) throw new Error("Failed to delete");
-
+      if (!response.ok) throw new Error();
       onDataUpdate();
-      toast({
-        title: "Success",
-        description: "Item deleted successfully.",
-      });
+      toast({ title: "Deleted", description: "Item removed successfully." });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete item.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", variant: "destructive", description: "Could not delete item." });
     } finally {
       setIsLoading(false);
       setIsDialogOpen(false);
-      setItemToDelete(null);
     }
   };
 
-  const validateAmounts = (): boolean => {
+  const handleAddProvidedItem = async () => {
     const bank = Number(bankPayments) || 0;
     const cash = Number(cashPayments) || 0;
     const total = Number(totalAmount) || 0;
 
-    if (!total) {
-      toast({
-        variant: "destructive",
-        title: "Missing Total",
-        description: "Please enter total amount.",
-      });
-      return false;
+    if (!areaType || !total || Math.abs(bank + cash - total) > 0.1) {
+      toast({ title: "Validation Error", variant: "destructive", description: "Check amounts and area." });
+      return;
     }
-
-    if (Math.abs(bank + cash - total) > 0.1) {
-      toast({
-        variant: "destructive",
-        title: "Balance Mismatch",
-        description: "Bank + Cash must equal Total.",
-      });
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleAddProvidedItem = async () => {
-    if (!areaType || !validateAmounts()) return;
 
     setIsLoading(true);
     try {
-      const response = await fetch("/api/setProvidedItem", {
+      await fetch("/api/setProvidedItem", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -241,27 +210,16 @@ const PriceBreakdown = ({
           brand,
           model,
           remark,
-          payInCash: Number(cashPayments) || 0,
-          payInOnline: Number(bankPayments) || 0,
+          payInCash: cash,
+          payInOnline: bank,
           gst: Number(gstAmount) || 0,
         }),
       });
-
-      if (!response.ok) throw new Error();
-
       onDataUpdate();
       handleClear();
       setIsAddDialogOpen(false);
-      toast({
-        title: "Success",
-        description: "Item added.",
-      });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add item.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", variant: "destructive", description: "Failed to add item." });
     } finally {
       setIsLoading(false);
     }
@@ -275,14 +233,9 @@ const PriceBreakdown = ({
     setBankPayments(item.payInOnline || 0);
     setCashPayments(item.payInCash || 0);
     setGstAmount(item.gst || 0);
-
-    if (total > 0 && item.gst > 0) {
-      const pct = (item.gst / total) * 100;
-      setGstPercentage(Number(pct.toFixed(2)));
-    } else {
-      setGstPercentage(10);
+    if (item.payInOnline > 0) {
+      setGstPercentage(Number(((item.gst / item.payInOnline) * 100).toFixed(2)));
     }
-
     setBrand(item.brand || "");
     setModel(item.model || "");
     setRemark(item.remark || "");
@@ -291,11 +244,9 @@ const PriceBreakdown = ({
   };
 
   const handleUpdateProvidedItem = async () => {
-    if (!areaType || !validateAmounts()) return;
-
     setIsLoading(true);
     try {
-      const response = await fetch("/api/setProvidedItem", {
+      await fetch("/api/setProvidedItem", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -310,373 +261,136 @@ const PriceBreakdown = ({
           gst: Number(gstAmount) || 0,
         }),
       });
-
-      if (!response.ok) throw new Error();
-
       onDataUpdate();
       setIsEditDialogOpen(false);
       handleClear();
-      toast({
-        title: "Success",
-        description: "Item updated.",
-      });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", variant: "destructive", description: "Update failed." });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Card>
+    <Card className="lg:p-4 shadow-md rounded-lg h-[443px] overflow-y-scroll">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
-          <Package className="h-5 w-5" />
-          Booked Items
+          <Package className="h-5 w-5" /> Booked Items
         </CardTitle>
-        <Dialog
-          open={isAddDialogOpen}
-          onOpenChange={(open) => {
-            setIsAddDialogOpen(open);
-            if (!open) handleClear();
-          }}
-        >
+        <Dialog open={isAddDialogOpen} onOpenChange={(open) => { setIsAddDialogOpen(open); if (!open) handleClear(); }}>
           <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Book Item
-            </Button>
+            <Button variant="outline" disabled={closedLead || isLoading}><PlusCircle className="mr-2 h-4 w-4" /> Book Item</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Book an Item</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <Tabs
-                value={activeTab}
-                onValueChange={(v) => setActiveTab(v as "main" | "additional")}
-              >
+          <DialogContent className="sm:max-w-[550px]">
+            <DialogHeader><DialogTitle>Book an Item</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-2">
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="main">Main</TabsTrigger>
                   <TabsTrigger value="additional">Additional</TabsTrigger>
                 </TabsList>
               </Tabs>
-
-              <div>
+              <div className="space-y-1">
                 <Label>Particulars</Label>
                 <Select value={areaType} onValueChange={setAreaType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select area" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {currentParticulars.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                  <SelectTrigger><SelectValue placeholder="Select area" /></SelectTrigger>
+                  <SelectContent>{currentParticulars.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-
-              <div>
-                <Label>Total Amount (₹)</Label>
-                <Input
-                  type="number"
-                  value={totalAmount}
-                  onChange={(e) =>
-                    handleTotalChange(
-                      e.target.value === "" ? "" : Number(e.target.value)
-                    )
-                  }
-                />
-              </div>
-
+              <div className="space-y-1"><Label>Total Amount (₹)</Label><Input type="number" value={totalAmount} onChange={(e) => handleTotalChange(e.target.value === "" ? "" : Number(e.target.value))} /></div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Bank Payment (₹)</Label>
-                  <Input
-                    type="number"
-                    value={bankPayments}
-                    onChange={(e) =>
-                      handleBankChange(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
-                    }
-                  />
-                </div>
-                <div>
-                  <Label>Cash Payment (₹)</Label>
-                  <Input
-                    type="number"
-                    value={cashPayments}
-                    onChange={(e) =>
-                      handleCashChange(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
-                    }
-                  />
-                </div>
+                <div className="space-y-1"><Label>Bank Payment (₹)</Label><Input type="number" value={bankPayments} onChange={(e) => handleBankChange(e.target.value === "" ? "" : Number(e.target.value))} /></div>
+                <div className="space-y-1"><Label>Cash Payment (₹)</Label><Input type="number" value={cashPayments} onChange={(e) => handleCashChange(e.target.value === "" ? "" : Number(e.target.value))} /></div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>GST Percentage (%)</Label>
-                  <Input
-                    type="number"
-                    value={gstPercentage}
-                    onChange={(e) => {
-                      setGstPercentage(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      );
-                      setLastEditedGstField("percentage");
-                    }}
-                  />
-                </div>
-                <div>
-                  <Label>GST Amount (₹)</Label>
-                  <Input
-                    type="number"
-                    value={gstAmount}
-                    onChange={(e) => {
-                      setGstAmount(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      );
-                      setLastEditedGstField("amount");
-                    }}
-                  />
-                </div>
+                <div className="space-y-1"><Label>GST %</Label><Input type="number" value={gstPercentage} onChange={(e) => { setGstPercentage(e.target.value === "" ? "" : Number(e.target.value)); setLastEditedGstField("percentage"); }} /></div>
+                <div className="space-y-1"><Label>GST Amount (₹)</Label><Input type="number" value={gstAmount} onChange={(e) => { setGstAmount(e.target.value === "" ? "" : Number(e.target.value)); setLastEditedGstField("amount"); }} /></div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Brand</Label>
-                  <Input
-                    value={brand}
-                    onChange={(e) => setBrand(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Model</Label>
-                  <Input
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                  />
-                </div>
+                <Input placeholder="Brand" value={brand} onChange={(e) => setBrand(e.target.value)} />
+                <Input placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
               </div>
-
-              <div>
-                <Label>Remark</Label>
-                <Input
-                  value={remark}
-                  onChange={(e) => setRemark(e.target.value)}
-                />
-              </div>
+              <Input placeholder="Remark" value={remark} onChange={(e) => setRemark(e.target.value)} />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={handleClear}>
-                Clear
-              </Button>
-              <Button onClick={handleAddProvidedItem} disabled={isLoading}>
-                {isLoading ? "Adding..." : "Add Item"}
-              </Button>
+              <Button variant="outline" onClick={handleClear}>Clear</Button>
+              <Button onClick={handleAddProvidedItem} disabled={isLoading}>Add Item</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </CardHeader>
-
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Area</TableHead>
-              <TableHead>Total</TableHead>
-              <TableHead>Bank</TableHead>
-              <TableHead>Cash</TableHead>
-              <TableHead>GST</TableHead>
+              <TableHead>Total (₹)</TableHead>
+              <TableHead>Bank (₹)</TableHead>
+              <TableHead>Cash (₹)</TableHead>
+              <TableHead>GST (₹)</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {priceBreakdown.length > 0 ? (
-              priceBreakdown.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>{item.area}</TableCell>
-                  <TableCell>
-                    ₹{(item.payInOnline + item.payInCash).toLocaleString()}
-                  </TableCell>
-                  <TableCell>₹{item.payInOnline.toLocaleString()}</TableCell>
-                  <TableCell>₹{item.payInCash.toLocaleString()}</TableCell>
-                  <TableCell>₹{item.gst.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEditItem(item)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setItemToDelete(item.id);
-                          setIsDialogOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-gray-500">
-                  No items booked.
+            {priceBreakdown.length > 0 ? priceBreakdown.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell className="font-medium text-xs">{item.area}</TableCell>
+                <TableCell>₹{(item.payInOnline + item.payInCash).toLocaleString()}</TableCell>
+                <TableCell>₹{item.payInOnline.toLocaleString()}</TableCell>
+                <TableCell>₹{item.payInCash.toLocaleString()}</TableCell>
+                <TableCell className="text-blue-600 font-semibold">₹{item.gst.toLocaleString()}</TableCell>
+                <TableCell className="flex gap-2">
+                  <Button size="icon" variant="ghost" disabled={closedLead} onClick={() => handleEditItem(item)}><Edit className="w-4 h-4 text-blue-500" /></Button>
+                  <Button size="icon" variant="ghost" disabled={closedLead} onClick={() => { setItemToDelete(item.id); setIsDialogOpen(true); }}><Trash2 className="w-4 h-4 text-red-500" /></Button>
                 </TableCell>
               </TableRow>
-            )}
+            )) : <TableRow><TableCell colSpan={6} className="text-center py-4 text-gray-500">No items booked.</TableCell></TableRow>}
           </TableBody>
+          {priceBreakdown.length > 0 && (
+            <TableFooter className="bg-muted/50 font-bold">
+              <TableRow>
+                <TableCell>Total Summary</TableCell>
+                <TableCell>₹{totals.total.toLocaleString()}</TableCell>
+                <TableCell>₹{totals.bank.toLocaleString()}</TableCell>
+                <TableCell>₹{totals.cash.toLocaleString()}</TableCell>
+                <TableCell className="text-blue-700">₹{totals.gst.toLocaleString()}</TableCell>
+                <TableCell />
+              </TableRow>
+            </TableFooter>
+          )}
         </Table>
       </CardContent>
 
-      {/* Edit Dialog */}
-      <Dialog
-        open={isEditDialogOpen}
-        onOpenChange={(open) => {
-          setIsEditDialogOpen(open);
-          if (!open) handleClear();
-        }}
-      >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Item</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Total Amount (₹)</Label>
-              <Input
-                type="number"
-                value={totalAmount}
-                onChange={(e) =>
-                  handleTotalChange(
-                    e.target.value === "" ? "" : Number(e.target.value)
-                  )
-                }
-              />
-            </div>
-
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => { setIsEditDialogOpen(open); if (!open) handleClear(); }}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader><DialogTitle>Edit Item</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1"><Label>Total Amount (₹)</Label><Input type="number" value={totalAmount} onChange={(e) => handleTotalChange(Number(e.target.value))} /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Bank Payment (₹)</Label>
-                <Input
-                  type="number"
-                  value={bankPayments}
-                  onChange={(e) =>
-                    handleBankChange(
-                      e.target.value === "" ? "" : Number(e.target.value)
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label>Cash Payment (₹)</Label>
-                <Input
-                  type="number"
-                  value={cashPayments}
-                  onChange={(e) =>
-                    handleCashChange(
-                      e.target.value === "" ? "" : Number(e.target.value)
-                    )
-                  }
-                />
-              </div>
+              <div className="space-y-1"><Label>Bank Payment (₹)</Label><Input type="number" value={bankPayments} onChange={(e) => handleBankChange(Number(e.target.value))} /></div>
+              <div className="space-y-1"><Label>Cash Payment (₹)</Label><Input type="number" value={cashPayments} onChange={(e) => handleCashChange(Number(e.target.value))} /></div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>GST %</Label>
-                <Input
-                  type="number"
-                  value={gstPercentage}
-                  onChange={(e) => {
-                    setGstPercentage(
-                      e.target.value === "" ? "" : Number(e.target.value)
-                    );
-                    setLastEditedGstField("percentage");
-                  }}
-                />
-              </div>
-              <div>
-                <Label>GST Amount (₹)</Label>
-                <Input
-                  type="number"
-                  value={gstAmount}
-                  onChange={(e) => {
-                    setGstAmount(
-                      e.target.value === "" ? "" : Number(e.target.value)
-                    );
-                    setLastEditedGstField("amount");
-                  }}
-                />
-              </div>
+              <div className="space-y-1"><Label>GST %</Label><Input type="number" value={gstPercentage} onChange={(e) => { setGstPercentage(Number(e.target.value)); setLastEditedGstField("percentage"); }} /></div>
+              <div className="space-y-1"><Label>GST Amount (₹)</Label><Input type="number" value={gstAmount} onChange={(e) => { setGstAmount(Number(e.target.value)); setLastEditedGstField("amount"); }} /></div>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Brand</Label>
-                <Input
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label>Model</Label>
-                <Input
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label>Remark</Label>
-              <Input
-                value={remark}
-                onChange={(e) => setRemark(e.target.value)}
-              />
-            </div>
+            <Input placeholder="Brand" value={brand} onChange={(e) => setBrand(e.target.value)} />
+            <Input placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
+            <Input placeholder="Remark" value={remark} onChange={(e) => setRemark(e.target.value)} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdateProvidedItem} disabled={isLoading}>
-              {isLoading ? "Updating..." : "Update Item"}
-            </Button>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleUpdateProvidedItem} disabled={isLoading}>Update Item</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
       <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-          </AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => itemToDelete && handleDelete(itemToDelete)}
-              disabled={isLoading}
-            >
-              {isLoading ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
+            <AlertDialogAction className="bg-red-600" onClick={() => itemToDelete && handleDelete(itemToDelete)}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
