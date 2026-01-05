@@ -96,21 +96,35 @@ const PriceBreakdown = ({
   const currentParticulars = activeTab === "main" ? mainParticulars : additionalParticulars;
 
   // STRICT CALCULATION LOGIC: GST = (Percentage * Bank Payment) / 100
-  useEffect(() => {
-    const bank = Number(bankPayments) || 0;
+ useEffect(() => {
+  const bank = Number(bankPayments) || 0;
 
-    if (lastEditedGstField === "percentage") {
-      const pct = gstPercentage === "" ? 0 : Number(gstPercentage);
-      const calculatedGst = (bank * pct) / 100;
-      setGstAmount(Number(calculatedGst.toFixed(2)));
-    } else if (lastEditedGstField === "amount") {
-      const amt = gstAmount === "" ? 0 : Number(gstAmount);
-      if (bank > 0) {
-        const calculatedPct = (amt / bank) * 100;
-        setGstPercentage(Number(calculatedPct.toFixed(2)));
-      }
+  // Default GST percentage = 18
+  const pct =
+    gstPercentage === "" || isNaN(Number(gstPercentage))
+      ? 18
+      : Number(gstPercentage);
+
+  // If user edits GST percentage → calculate GST amount
+  if (lastEditedGstField === "percentage") {
+    const gst = (bank * pct) / 100;
+    setGstPercentage(pct); // ensures default 18 is applied
+    setGstAmount(Number(gst.toFixed(2)));
+  }
+
+  // If user edits GST amount → calculate GST percentage
+  if (lastEditedGstField === "amount") {
+    const amt = Number(gstAmount) || 0;
+
+    if (bank > 0) {
+      const calculatedPct = (amt / bank) * 100;
+      setGstPercentage(Number(calculatedPct.toFixed(2)));
+    } else {
+      setGstPercentage(18); // fallback safety
     }
-  }, [gstPercentage, gstAmount, bankPayments, lastEditedGstField]);
+  }
+}, [gstPercentage, gstAmount, bankPayments, lastEditedGstField]);
+
 
   const handleTotalChange = (value: number | "") => {
     setTotalAmount(value);
