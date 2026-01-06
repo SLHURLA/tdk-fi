@@ -621,7 +621,7 @@ const mainParticulars = Object.values(AreaType).filter(
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="gstAmount">GST Amount (₹)</Label>
+                    <Label htmlFor="gstAmount">GST Amount ₹</Label>
                     <Input
                       id="gstAmount"
                       type="number"
