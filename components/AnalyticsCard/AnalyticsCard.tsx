@@ -13,7 +13,7 @@ export default function AnalyticsCard() {
       <CardContent className="flex justify-between items-start p-5">
         <div>
           <CardTitle className="text-sm font-medium text-gray-600">
-            Total Revenue
+            Total Revenue Generated
           </CardTitle>
           <p className="text-3xl font-semibold mt-1">$45,231.89</p>
           <CardDescription className="text-sm text-gray-500 mt-1">
