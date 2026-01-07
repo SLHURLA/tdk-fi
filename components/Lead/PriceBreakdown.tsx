@@ -647,7 +647,7 @@ const mainParticulars = Object.values(AreaType).filter(
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="model">Model</Label>
+                    <Label htmlFor="model">Model Name</Label>
                     <Input
                       id="model"
                       placeholder="Enter model name"
