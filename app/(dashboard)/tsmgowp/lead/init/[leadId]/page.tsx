@@ -1150,11 +1150,11 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
   useEffect(() => {
     if (lastEditedGstField === "percentage" && gstPercentage && onlineAmount) {
       // Calculate GST amount from percentage based ONLY on Bank Payment
-      const calculatedGstAmount = (bankPayment * Number(gstPercentage)) / 100;
+      const calculatedGstAmount = (onlineAmount * Number(gstPercentage)) / 100;
       setGstAmount(Number(calculatedGstAmount.toFixed(2)));
-    } else if (lastEditedGstField === "amount" && gstAmount && onlineAmount && bankPayment > 0) {
+    } else if (lastEditedGstField === "amount" && gstAmount && onlineAmount && onlineAmount > 0) {
       // Calculate GST percentage from amount based ONLY on Bank Payment
-      const calculatedGstPercentage = (Number(gstAmount) / bankPayment) * 100;
+      const calculatedGstPercentage = (Number(gstAmount) / onlineAmount) * 100;
       setGstPercentage(Number(calculatedGstPercentage.toFixed(2)));
     }
   }, [gstPercentage, gstAmount, onlineAmount, lastEditedGstField]);
