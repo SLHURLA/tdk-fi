@@ -1148,19 +1148,16 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
 
   // Calculate GST when percentage or amount changes
   useEffect(() => {
-    if (lastEditedGstField === "percentage" && gstPercentage && totalAmount) {
-      // Calculate GST amount from percentage
-      const baseAmount =
-        (Number(totalAmount) * 100) / (100 + Number(gstPercentage));
-      const calculatedGstAmount = Number(totalAmount) - baseAmount;
+    if (lastEditedGstField === "percentage" && gstPercentage && onlineAmount) {
+      // Calculate GST amount from percentage based ONLY on Bank Payment
+      const calculatedGstAmount = (bankPayment * Number(gstPercentage)) / 100;
       setGstAmount(Number(calculatedGstAmount.toFixed(2)));
-    } else if (lastEditedGstField === "amount" && gstAmount && totalAmount) {
-      // Calculate GST percentage from amount
-      const baseAmount = Number(totalAmount) - Number(gstAmount);
-      const calculatedGstPercentage = (Number(gstAmount) / baseAmount) * 100;
+    } else if (lastEditedGstField === "amount" && gstAmount && onlineAmount && bankPayment > 0) {
+      // Calculate GST percentage from amount based ONLY on Bank Payment
+      const calculatedGstPercentage = (Number(gstAmount) / bankPayment) * 100;
       setGstPercentage(Number(calculatedGstPercentage.toFixed(2)));
     }
-  }, [gstPercentage, gstAmount, totalAmount, lastEditedGstField]);
+  }, [gstPercentage, gstAmount, onlineAmount, lastEditedGstField]);
 
   // Handle cash amount change
   const handleCashChange = (value: number | "") => {
@@ -1309,7 +1306,7 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
 
     toast({
       title: "Item Added",
-      description: "Booked item has been added successfully.",
+      description: "Booked item has been added successfully.GST applied to Bank Payment only.",
     });
   };
 
@@ -1374,7 +1371,7 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
 
           {/* Total Amount */}
           <div className="space-y-2">
-            <Label htmlFor="totalAmount">Total Amount (₹)</Label>
+            <Label htmlFor="totalAmount">Total Amount ₹</Label>
             <Input
               id="totalAmount"
               type="number"
@@ -1387,7 +1384,7 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
           {/* Online and Cash Inputs */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="onlineAmount">Bank Payments (₹)</Label>
+              <Label htmlFor="onlineAmount">Bank Payments ₹</Label>
               <Input
                 id="onlineAmount"
                 type="number"
@@ -1399,7 +1396,7 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cashAmount">Cash Payments (₹)</Label>
+              <Label htmlFor="cashAmount">Cash Payments ₹</Label>
               <Input
                 id="cashAmount"
                 type="number"
@@ -1413,7 +1410,7 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
           {/* GST Amount and Percentage */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="gstPercentage">GST Percentage (%)</Label>
+              <Label htmlFor="gstPercentage">GST Percentage %</Label>
               <Input
                 id="gstPercentage"
                 type="number"
