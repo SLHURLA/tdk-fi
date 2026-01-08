@@ -1,17 +1,11 @@
 import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-
+//fix
 export default async function Home() {
   const session = await getServerSession();
-  
-  if (session) {
-    redirect('/tsmgowp/');
-  }
-  
+  console.log(JSON.stringify(session));
   return (
-    <div>
-      {/* Your actual homepage content here */}
-      <h1>Welcome to Your App</h1>
+    <div className="h-screen w-full flex justify-center items-center text-5xl">
+      COMING SOON
     </div>
   );
 }
