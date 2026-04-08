@@ -13,15 +13,19 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { format } from "date-fns";
+// ✅ CORRECT (Each icon listed only once)
 import { 
+  Activity,
+  CheckCircle2, 
+  Search, 
+  Users, 
+  Sparkles,
   CalendarIcon, 
   Download, 
-  Search, 
-  Filter, 
-  Users, 
-  Activity, 
-  Sparkles 
+  Filter,
+  Loader2 // If you are using it elsewhere
 } from "lucide-react";
+
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
@@ -113,7 +117,11 @@ export function DataTable<TData, TValue>({
     return {
       all: filteredData.length,
       fresh: filteredData.filter((item: any) => !item.init).length,
-      live: filteredData.filter((item: any) => item.status === "INPROGRESS" || item.status === "WON").length,
+      live: data.filter((item: any) => 
+      (item.status === "INPROGRESS" || item.status === "WON") && item.init === true
+    ).length,
+      // Add this line:
+    closed: filteredData.filter((item: any) => item.status === "CLOSED").length,
     };
   }, [filteredData]);
 
@@ -164,10 +172,10 @@ export function DataTable<TData, TValue>({
 
   return (
     // Replaced hardcoded black with adaptive background and text
-    <div className="space-y-6 p-4 bg-background text-foreground transition-colors">
+    <div className="w-full max-w-none mx-0 px-0 space-y-4 bg-background text-foreground transition-colors pt-0">
       
       {/* --- STATS SECTION --- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-l-4 border-l-muted-foreground shadow-sm">
           <CardContent className="flex items-center p-5">
             <div className="bg-muted p-3 rounded-full mr-4">
@@ -203,6 +211,18 @@ export function DataTable<TData, TValue>({
             </div>
           </CardContent>
         </Card>
+        {/* --- CLOSED LEADS CARD --- */}
+<Card className="border-l-4 border-l-violet-600 shadow-sm">
+  <CardContent className="flex items-center p-5">
+    <div className="bg-violet-100 dark:bg-violet-900/20 p-3 rounded-full mr-4">
+      <CheckCircle2 className="h-5 w-5 text-violet-600" />
+    </div>
+    <div>
+      <p className="text-xs font-semibold text-muted-foreground uppercase">Closed Leads</p>
+      <h3 className="text-2xl font-bold text-violet-600">{stats.closed}</h3>
+    </div>
+  </CardContent>
+</Card>
       </div>
 
       {/* --- FILTERS BAR --- */}

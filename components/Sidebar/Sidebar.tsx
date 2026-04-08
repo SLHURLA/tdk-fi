@@ -129,6 +129,14 @@ export function AppSidebar() {
           dialog: false,
           requiredRole: "STORE_MANAGER",
         },
+        // --- ADD THIS SECTION ---
+    {
+      title: "Closed Leads",
+      url: "/tsmgowp/leads/closed",
+      icon: <FilePlus className="w-4 h-4" />,
+      dialog: false,
+      requiredRole: "STORE_MANAGER",
+    },
         {
           title: "All Customers",
           url: "/tsmgowp/leads/all",

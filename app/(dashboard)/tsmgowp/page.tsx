@@ -210,94 +210,90 @@ export default function Dashboard() {
       };
     }
 
-    // For store manager, we need to structure the data differently
+    /**
+     * Helper to enforce your new formulas:
+     * 1. Gross Profit = Revenue - Vendor Payments
+     * 2. Total Profit = Gross Profit - Store Expenses
+     */
+    const calculateMetrics = (item: any) => {
+      const revenue = Number(item.revenue) || 0;
+      const vendorPayments = Number(item.totalVendorPayments) || 0;
+      const storeExpenses = Number(item.totalExpenses) || 0;
+// FIX: Look for 'receiveCash' OR 'cash' (check your API response)
+  const cashRec = Number(item.receiveCash) || 0;
+  const onlineRec = Number(item.receiveOnline) || 0;
+      const grossProfit = revenue - vendorPayments;
+      const netTotalProfit = grossProfit - storeExpenses;
+
+      return {
+        ...item,
+        revenue,
+        totalVendorPayments: vendorPayments,
+        totalExpenses: storeExpenses,
+        grossProfit: grossProfit, // New field for your UI
+        totalProfit: netTotalProfit, // Overwriting API totalProfit with your custom logic
+        receiveCash: cashRec,     // Ensure this is mapped
+    receiveOnline: onlineRec, // Ensure this is mapped
+      };
+    };
+
+    // 1. Logic for STORE_MANAGER
     if (isStoreManager) {
       const storeRevenueData =
-        data.monthWiseRevenue?.map((item: any) => ({
-          month: item.monthYear || item.month,
-          revenue: item.revenue,
-          totalProfit: item.totalProfit,
-          projectClose: item.projectClose,
-          totalProjects: item.totalProjects || 0,
-          totalVendorPayments: item.totalVendorPayments ?? 0, // Use nullish coalescing
-          totalExpenses: item.totalExpenses || 0,
-          cash: item.cash || 0,
-          online: item.online || 0,
-          receiveCash: item.receiveCash || 0,
-          receiveOnline: item.receiveOnline || 0,
-          payInCash: item.payInCash || 0,
-          payInOnline: item.payInOnline || 0,
-        })) || [];
+        data.monthWiseRevenue?.map((item: any) => 
+          calculateMetrics({
+            ...item,
+            month: item.monthYear || item.month,
+          })
+        ) || [];
+
+      const storeFinYearData = 
+        data.finYearWiseRevenue?.map((item: any) => calculateMetrics(item)) || [];
 
       return {
         revenueData: storeRevenueData,
         userStoreWiseRevenue: {},
-        finYearData:
-          data.finYearWiseRevenue?.map((item: any) => ({
-            finYear: item.finYear,
-            totalProfit: item.totalProfit,
-            revenue: item.revenue,
-            projectClose: item.projectClose,
-            totalProjects: item.totalProjects || 0,
-            totalVendorPayments: item.totalVendorPayments ?? 0, // Use nullish coalescing
-            totalExpenses: item.totalExpenses || 0,
-            cash: item.cash || 0,
-            online: item.online || 0,
-            receiveCash: item.receiveCash || 0,
-            receiveOnline: item.receiveOnline || 0,
-            payInCash: item.payInCash || 0,
-            payInOnline: item.payInOnline || 0,
-          })) || [],
+        finYearData: storeFinYearData,
         storeData: [],
       };
     }
+    
 
-    // Original admin data transformation
+    // 2. Logic for ADMIN / SUPER_HEAD
     const finYearData: FinYearData[] =
-      data.finYearWiseRevenue?.map((item: any) => ({
-        finYear: item.finYear,
-        totalProfit: item.totalProfit,
-        revenue: item.revenue,
-        projectClose: item.projectClose,
-        totalProjects: item.totalProjects || 0,
-        totalVendorPayments: item.totalVendorPayments ?? 0, // Use nullish coalescing
-        totalExpenses: item.totalExpenses || 0,
-        cash: item.cash || 0,
-        online: item.online || 0,
-        receiveCash: item.receiveCash || 0,
-        receiveOnline: item.receiveOnline || 0,
-        payInCash: item.payInCash || 0,
-        payInOnline: item.payInOnline || 0,
-      })) || [];
+      data.finYearWiseRevenue?.map((item: any) => calculateMetrics(item)) || [];
 
     const userStoreWiseRevenue =
       data.userStoreWiseRevenue?.reduce(
         (acc: Record<string, StoreData>, item: any) => {
           const key = `${item.userId}-${item.store}`;
-          acc[key] = {
+          acc[key] = calculateMetrics({
             userId: item.userId,
             store: item.store,
             revenue: item.revenue,
-            totalProfit: item.totalProfit,
-            projectClose: item.projectClose,
-            cash: item.cash,
-            online: item.online,
-            receiveCash: item.receiveCash,
-            receiveOnline: item.receiveOnline,
-            payInCash: item.payInCash,
-            payInOnline: item.payInOnline,
+            totalVendorPayments: item.totalVendorPayments,
             totalExpenses: item.totalExpenses,
-          };
+            projectClose: item.projectClose,
+          });
           return acc;
         },
         {}
       ) || {};
 
+    // Transforming the comparison storeData array
+    const transformedStoreData = data.storeData?.map((store: any) => ({
+      ...store,
+      yearly: store.yearly?.map((y: any) => calculateMetrics(y)),
+      monthly: store.monthly?.map((m: any) => calculateMetrics(m)),
+      quarterly: store.quarterly?.map((q: any) => calculateMetrics(q)),
+      financialYear: store.financialYear?.map((fy: any) => calculateMetrics(fy)),
+    })) || [];
+
     return {
-      revenueData: data.monthWiseRevenue || [],
+      revenueData: data.monthWiseRevenue?.map((item: any) => calculateMetrics(item)) || [],
       userStoreWiseRevenue,
       finYearData,
-      storeData: data.storeData || [],
+      storeData: transformedStoreData,
     };
   };
 
@@ -700,7 +696,7 @@ export default function Dashboard() {
               </div>
 
               {/* Top metrics - modified for tab-specific display */}
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 {/* Total Revenue - shown in both tabs */}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -780,6 +776,23 @@ export default function Dashboard() {
                       </p>
                     </CardContent>
                   </Card>
+                )}
+                {activeTab === "handover" && (
+                    <Card className="shadow-sm border-t-4 ">
+    <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <CardTitle className="text-sm font-medium">
+        Gross Profit
+      </CardTitle>
+      <TrendingUp className="h-4 w-4" />
+    </CardHeader>
+    <CardContent>
+      <div className="text-2xl font-bold ">
+        ₹{formatNumber(filteredData.reduce((acc, item) => acc + (item.grossProfit || 0), 0))}
+      </div>
+      <p className="text-xs text-muted-foreground mt-1">Margin after material</p>
+    </CardContent>
+  </Card>
+
                 )}
                 {/* Total Profit - shown in both tabs */}
                 {activeTab === "handover" && (
@@ -954,137 +967,57 @@ export default function Dashboard() {
                     </CardContent>
                   </Card>
                 )}
+                
               </div>
 
-              {/* Payment methods - only shown in ongoing tab */}
-              {activeTab === "ongoing" && (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-6">
-                  {/* <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Pay in Cash
-                      </CardTitle>
-                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        ₹
-                        {formatNumber(
-                          timeframe === "financial"
-                            ? selectedFinYearData?.payInCash || 0
-                            : filteredData.reduce(
-                                (acc, item) => acc + (item.payInCash || 0),
-                                0
-                              )
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Total cash payments
-                      </p>
-                    </CardContent>
-                  </Card> */}
-                  {/* <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Pay Online
-                      </CardTitle>
-                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        ₹
-                        {formatNumber(
-                          timeframe === "financial"
-                            ? selectedFinYearData?.payInOnline || 0
-                            : filteredData.reduce(
-                                (acc, item) => acc + (item.payInOnline || 0),
-                                0
-                              )
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Total online payments
-                      </p>
-                    </CardContent>
-                  </Card> */}
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Receive in Cash
-                      </CardTitle>
-                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        ₹
-                        {formatNumber(
-                          timeframe === "financial"
-                            ? selectedFinYearData?.receiveCash || 0
-                            : filteredData.reduce(
-                                (acc, item) => acc + (item.receiveCash || 0),
-                                0
-                              )
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Total cash receipts
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Receive Online
-                      </CardTitle>
-                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        ₹
-                        {formatNumber(
-                          timeframe === "financial"
-                            ? selectedFinYearData?.receiveOnline || 0
-                            : filteredData.reduce(
-                                (acc, item) => acc + (item.receiveOnline || 0),
-                                0
-                              )
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Total online receipts
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Receive Total
-                      </CardTitle>
-                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        ₹
-                        {formatNumber(
-                          timeframe === "financial"
-                            ? (selectedFinYearData?.receiveOnline || 0) +
-                                (selectedFinYearData?.receiveCash || 0)
-                            : filteredData.reduce(
-                                (acc, item) =>
-                                  acc +
-                                  (item.receiveOnline || 0) +
-                                  (item.receiveCash || 0),
-                                0
-                              )
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Total receipts Online + Cash
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
+              {/* Updated logic to show on both Handover and Ongoing */}
+{(activeTab === "ongoing") && (
+  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-6">
+    
+    {/* Cash Received Card */}
+    <Card className="border-l-4 border-l-amber-500">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium">Cash Received</CardTitle>
+        <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold text-amber-600">
+          ₹{formatNumber(filteredData.reduce((acc, item) => acc + (item.receiveCash || 0), 0))}
+        </div>
+        <p className="text-[10px] text-muted-foreground uppercase">In-Hand Collection</p>
+      </CardContent>
+    </Card>
+
+    {/* Bank Received Card */}
+    <Card className="border-l-4 border-l-blue-500">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium">Bank Received</CardTitle>
+        <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold text-blue-600">
+          ₹{formatNumber(filteredData.reduce((acc, item) => acc + (item.receiveOnline || 0), 0))}
+        </div>
+        <p className="text-[10px] text-muted-foreground uppercase">Online Transfers</p>
+      </CardContent>
+    </Card>
+
+    {/* Optional: Add a Total Receipt Card */}
+    <Card className="bg-muted/20">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium">Total Received</CardTitle>
+        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">
+          ₹{formatNumber(filteredData.reduce((acc, item) => acc + (item.receiveCash || 0) + (item.receiveOnline || 0), 0))}
+        </div>
+        <p className="text-[10px] text-muted-foreground uppercase">Cash + Bank</p>
+      </CardContent>
+    </Card>
+
+  </div>
+)}
               {/* Financial Year Overview Card */}
               {timeframe === "financial" && selectedFinYear && (
                 <Card className="mt-4">
