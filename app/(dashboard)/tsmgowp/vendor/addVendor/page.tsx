@@ -86,11 +86,22 @@ const AddVendor = () => {
         body: JSON.stringify(values),
       });
 
+      // if (response.ok) {
+      //   toast({ description: "Vendor Added Successfully" });
+      //   router.push("/tsmgowp/vendor/dashboard");
+      // } else {
+      //   toast({ description: "Failed to create vendor" });
+      // }
+      const data = await response.json();
+
       if (response.ok) {
         toast({ description: "Vendor Added Successfully" });
         router.push("/tsmgowp/vendor/dashboard");
       } else {
-        toast({ description: "Failed to create vendor" });
+        toast({
+          description: data.message || "Something went wrong",
+          variant: "destructive", // 🔥 makes it red (better UX)
+        });
       }
     } catch (error) {
       console.log(error);

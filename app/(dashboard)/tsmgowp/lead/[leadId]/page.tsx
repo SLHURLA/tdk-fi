@@ -49,7 +49,7 @@ const SingleLead = () => {
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
       refreshInterval: 3000, // Poll every 3 seconds
-    }
+    },
   );
   useEffect(() => {
     console.log("Lead data updated:", data);
@@ -58,10 +58,10 @@ const SingleLead = () => {
   const { data: session } = useSession();
   const [hasMounted, setHasMounted] = useState(false);
   const [selectedVendorId, setSelectedVendorId] = useState<number | undefined>(
-    undefined
+    undefined,
   );
   const [prefilledAmount, setPrefilledAmount] = useState<number | undefined>(
-    undefined
+    undefined,
   );
 
   const [paymentMethod, setPaymentMethod] = useState<
@@ -74,6 +74,7 @@ const SingleLead = () => {
   const [showHandoverModal, setShowHandoverModal] = useState(false);
   const [remainingPayment, setRemainingPayment] = useState(0);
   const [isHandingOver, setIsHandingOver] = useState(false);
+  const [handoverDate, setHandoverDate] = useState("");
 
   console.log("LEAD DATA", data);
 
@@ -131,6 +132,14 @@ const SingleLead = () => {
       });
       return;
     }
+    if (!handoverDate) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select handover date",
+      });
+      return;
+    }
 
     const hasIncompleteVendorPayments = data.vendors.some(
       (vendor: VendorWithBreakdown) => {
@@ -139,7 +148,7 @@ const SingleLead = () => {
           // If totalAmt > totalGiven, payment is incomplete
           return breakdown.totalAmt > breakdown.totalGiven;
         });
-      }
+      },
     );
 
     console.log("HASINCOMPLETEPAYMENTS", hasIncompleteVendorPayments);
@@ -174,6 +183,7 @@ const SingleLead = () => {
         body: JSON.stringify({
           userId: Number(session?.user?.id),
           leadId: Number(data?.id),
+          handoverDate: handoverDate, // 🔥 IMPORTANT
         }),
       });
 
@@ -270,7 +280,10 @@ const SingleLead = () => {
                 <DialogTitle>Customer Overview</DialogTitle>
               </DialogHeader>
               <LeadOverview
-                leadId={data.lead_id}
+                // // leadId={data.lead_id}
+                // leadId={data.id}
+                leadId={data.id} // for backend
+                displayLeadId={data.lead_id} // for UI
                 customer={data.customerName}
                 phone={data.phoneNo}
                 contactInfo={data.contactInfo}
@@ -279,14 +292,14 @@ const SingleLead = () => {
                 createdAt={new Date(data.createdAt).toLocaleDateString("en-GB")}
                 updatedAt={new Date(data.updatedAt).toLocaleDateString("en-GB")}
                 expectedHandover={new Date(
-                  data.expectedHandoverDate
+                  data.expectedHandoverDate,
                 ).toLocaleDateString("en-GB")}
               />
             </DialogContent>
           </Dialog>
         </div>
       </div>
-      <div className="flex gap-2 items-center mt-8 justify-between flex-wrap">
+      {/* <div className="flex gap-2 items-center mt-8 justify-between flex-wrap">
         <div className="flex items-center gap-4">
           {data.status === "CLOSED" && (
             <>
@@ -319,6 +332,77 @@ const SingleLead = () => {
             <Button onClick={handleProjectHandOver}>Handover Project</Button>
           )}
           <PDFDownloadButton data={data} />
+        </div>
+      </div> */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center mt-8 justify-between border-y py-4 border-gray-100">
+        {/* Data Metrics Section */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          {data.status === "CLOSED" && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-medium text-muted-foreground">
+                Total Profit:
+              </span>
+              <span className="text-base font-bold text-green-600 flex items-center">
+                <IndianRupee size={14} className="mr-0.5" />
+                {(
+                  data.receiveCash +
+                  data.receiveOnline -
+                  data.totalExp -
+                  data.totalGST
+                ).toLocaleString("en-IN")}
+              </span>
+            </div>
+          )}
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-medium text-muted-foreground">
+              Total GST:
+            </span>
+            <span className="text-base font-semibold flex items-center">
+              <IndianRupee size={14} className="mr-0.5" />
+              {data.totalGST.toLocaleString("en-IN")}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-medium text-muted-foreground">
+              Vendor Exp:
+            </span>
+            <span className="text-base font-semibold flex items-center">
+              <IndianRupee size={14} className="mr-0.5" />
+              {data.totalExp.toLocaleString("en-IN")}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-medium text-muted-foreground">
+              Total Exp:
+            </span>
+            <span className="text-base font-bold flex items-center">
+              <IndianRupee size={14} className="mr-0.5" />
+              {(data.totalGST + data.totalExp).toLocaleString("en-IN")}
+            </span>
+          </div>
+        </div>
+
+        {/* Actions Section */}
+        <div className="flex items-center gap-3">
+          <RoundOff leadId={Array.isArray(leadId) ? leadId[0] : leadId || ""} />
+
+          {data.status !== "CLOSED" && (
+            <Button
+              onClick={handleProjectHandOver}
+              variant="default"
+              size="sm"
+              className="h-9"
+            >
+              Handover Project
+            </Button>
+          )}
+
+          <div className="scale-90 origin-right">
+            <PDFDownloadButton data={data} />
+          </div>
         </div>
       </div>
       <div className="py-4">
@@ -395,6 +479,18 @@ const SingleLead = () => {
             <p className="mb-4">
               Are you sure you want to hand over this project?
             </p>
+            <div className="mb-4">
+              <label className="text-sm font-medium">
+                Select Handover Date
+              </label>
+
+              <input
+                type="date"
+                value={handoverDate}
+                onChange={(e) => setHandoverDate(e.target.value)}
+                className="w-full mt-1 border px-2 py-1 rounded"
+              />
+            </div>
 
             {remainingPayment > 0 && (
               <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-4">

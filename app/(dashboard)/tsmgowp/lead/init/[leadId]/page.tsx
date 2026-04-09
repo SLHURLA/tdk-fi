@@ -96,7 +96,7 @@ const InitLead: React.FC = () => {
   const { leadId } = useParams();
   const { data, error, isLoading } = useSWR<Lead>(
     `/getLead/${leadId}`,
-    fetcher
+    fetcher,
   );
 
   const { toast } = useToast();
@@ -104,7 +104,7 @@ const InitLead: React.FC = () => {
   const [providedItems, setProvidedItems] = useState<ProvidedItem[]>([]);
   const [additionalItems, setAdditionalItems] = useState<AdditionalItem[]>([]);
   const [selectedAreaType, setSelectedAreaType] = useState<AreaType | null>(
-    null
+    null,
   );
   const [brand, setBrand] = useState("");
   const [remark, setRemark] = useState("");
@@ -122,7 +122,7 @@ const InitLead: React.FC = () => {
   const [payInOnline, setPayInOnline] = useState<number>(0);
   const [additionalItemsPrice, setAdditionalItemsPrice] = useState<number>(0);
   const [expectedHandoverDate, setExpectedHandoverDate] = useState<Date>(
-    new Date("2025-01-01")
+    new Date("2025-01-01"),
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [providedItemDialogOpen, setProvidedItemDialogOpen] = useState(false);
@@ -179,7 +179,7 @@ const InitLead: React.FC = () => {
   useEffect(() => {
     const total = additionalItems.reduce(
       (sum, item) => sum + item.custPrice,
-      0
+      0,
     );
     setAdditionalItemsPrice(total);
   }, [additionalItems]);
@@ -187,7 +187,7 @@ const InitLead: React.FC = () => {
   useEffect(() => {
     const total = providedItems.reduce(
       (sum, item) => sum + item.totalAmount,
-      0
+      0,
     );
     setTotalBookedAmount(total);
   }, [providedItems]);
@@ -214,12 +214,12 @@ const InitLead: React.FC = () => {
 
   const calculateOverallGST = (
     provided: ProvidedItem[],
-    additional: AdditionalItem[]
+    additional: AdditionalItem[],
   ) => {
     const providedGST = provided.reduce((sum, item) => sum + item.gstAmount, 0);
     const additionalGST = additional.reduce(
       (sum, item) => sum + item.gstAmount,
-      0
+      0,
     );
     setOverallGST(providedGST + additionalGST);
   };
@@ -953,7 +953,7 @@ const InitLead: React.FC = () => {
                   </div>
                   <div className="flex justify-between">
                     <div className="space-y-2">
-                      <Label htmlFor="totalKitchenCost">Total GST (₹)</Label>
+                      <Label htmlFor="totalKitchenCost">GST (₹)</Label>
                       <div className="relative">
                         <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                         <Input
@@ -1100,8 +1100,11 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
   const [areaType, setAreaType] = useState<string>("");
   const [totalAmount, setTotalAmount] = useState<number | "">("");
   const [onlineAmount, setOnlineAmount] = useState<number | "">("");
+  const [gstMode, setGstMode] = useState<"INCLUSIVE" | "EXCLUSIVE">(
+    "EXCLUSIVE",
+  );
   const [cashAmount, setCashAmount] = useState<number | "">("");
-  const [gstPercentage, setGstPercentage] = useState<number | "">("");
+  const [gstPercentage, setGstPercentage] = useState<number | "">(18);
   const [gstAmount, setGstAmount] = useState<number | "">("");
   const [brand, setBrand] = useState<string>("");
   const [model, setModel] = useState<string>("");
@@ -1116,7 +1119,7 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
   // Main items particulars - these are AreaTypes that are NOT in AdditionalItemsList
   const mainParticulars = Object.values(AreaType).filter(
     (area) =>
-      !["Counter_top", "Appliances", "Sink", "Installation"].includes(area)
+      !["Counter_top", "Appliances", "Sink", "Installation"].includes(area),
   );
 
   // Additional items particulars - these are explicitly from AdditionalItemsList
@@ -1147,15 +1150,43 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
   };
 
   // Calculate GST when percentage or amount changes
+  // useEffect(() => {
+  //   if (lastEditedGstField === "percentage" && gstPercentage && onlineAmount) {
+  //     // Calculate GST amount from percentage based ONLY on Bank Payment
+  //     const calculatedGstAmount = (onlineAmount * Number(gstPercentage)) / 100;
+  //     setGstAmount(Number(calculatedGstAmount.toFixed(2)));
+  //   } else if (lastEditedGstField === "amount" && gstAmount && onlineAmount && onlineAmount > 0) {
+  //     // Calculate GST percentage from amount based ONLY on Bank Payment
+  //     const calculatedGstPercentage = (Number(gstAmount) / onlineAmount) * 100;
+  //     setGstPercentage(Number(calculatedGstPercentage.toFixed(2)));
+  //   }
+  // }, [gstPercentage, gstAmount, onlineAmount, lastEditedGstField]);
   useEffect(() => {
-    if (lastEditedGstField === "percentage" && gstPercentage && onlineAmount) {
-      // Calculate GST amount from percentage based ONLY on Bank Payment
-      const calculatedGstAmount = (onlineAmount * Number(gstPercentage)) / 100;
-      setGstAmount(Number(calculatedGstAmount.toFixed(2)));
-    } else if (lastEditedGstField === "amount" && gstAmount && onlineAmount && onlineAmount > 0) {
-      // Calculate GST percentage from amount based ONLY on Bank Payment
-      const calculatedGstPercentage = (Number(gstAmount) / onlineAmount) * 100;
-      setGstPercentage(Number(calculatedGstPercentage.toFixed(2)));
+    if (!onlineAmount || onlineAmount <= 0) return;
+
+    // ✅ GST from percentage
+    if (lastEditedGstField === "percentage" && gstPercentage !== "") {
+      const pct = Number(gstPercentage);
+
+      const gst = onlineAmount * (pct / (100 + pct));
+
+      setGstAmount(Number(gst.toFixed(2)));
+    }
+
+    // ✅ Percentage from GST
+    if (lastEditedGstField === "amount" && gstAmount !== "") {
+      const amt = Number(gstAmount);
+
+      const base = onlineAmount - amt;
+
+      if (base <= 0) {
+        setGstPercentage(0);
+        return;
+      }
+
+      const pct = (amt / base) * 100;
+
+      setGstPercentage(Number(pct.toFixed(2)));
     }
   }, [gstPercentage, gstAmount, onlineAmount, lastEditedGstField]);
 
@@ -1170,7 +1201,11 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
       setOnlineAmount(totalAmount);
     }
   };
-
+  useEffect(() => {
+    if (onlineAmount && gstPercentage) {
+      setLastEditedGstField("percentage");
+    }
+  }, [onlineAmount]);
   // Handle online amount change
   const handleOnlineChange = (value: number | "") => {
     setOnlineAmount(value);
@@ -1306,7 +1341,8 @@ const BookItemSection: React.FC<BookItemSectionProps> = ({
 
     toast({
       title: "Item Added",
-      description: "Booked item has been added successfully.GST applied to Bank Payment only.",
+      description:
+        "Booked item has been added successfully.GST applied to Bank Payment only.",
     });
   };
 

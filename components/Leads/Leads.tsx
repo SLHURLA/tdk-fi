@@ -42,8 +42,8 @@ export default function Leads({ session, url }: { session: any; url: string }) {
 
   if (isLoading || !data) {
     return (
-      <div className="container mx-auto py-10 flex justify-center ">
-        <Loader2 className="animate-spin w-8 h-8 text-gray-500" />
+      <div className="w-full min-h-[70vh] flex items-center justify-center">
+        <Loader2 className="animate-spin w-10 h-10 text-gray-500" />
       </div>
     );
   }
@@ -55,7 +55,8 @@ export default function Leads({ session, url }: { session: any; url: string }) {
       : data;
 
   return (
-    <div className="container mx-auto py-10">
+    // 'w-full' ensures it hits the edges, 'pt-2' reduces the top gap
+    <div className="w-full p-0 -ml-16 lg:-ml-18"> 
       <DataTable columns={columns} data={filteredData} />
     </div>
   );

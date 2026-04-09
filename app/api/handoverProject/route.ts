@@ -3,11 +3,15 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { userId, leadId } = body;
-  console.log(userId, "=>", leadId);
+  // const { userId, leadId } = body;
+  // console.log(userId, "=>", leadId);
+  const { userId, leadId, handoverDate } = body;
+  console.log(userId, "=>", leadId, "=>", handoverDate);
+
+  const selectedDate = new Date(handoverDate);
 
   //find month year
-  const today = new Date();
+  // const today = new Date();
 
   const monthNames = [
     "January",
@@ -24,8 +28,10 @@ export async function POST(request: NextRequest) {
     "December",
   ];
 
-  const month = monthNames[today.getMonth()];
-  const year = today.getFullYear().toString();
+  // const month = monthNames[today.getMonth()];
+  // const year = today.getFullYear().toString();
+  const month = monthNames[selectedDate.getMonth()];
+  const year = selectedDate.getFullYear().toString();
 
   try {
     const lead = await db.lead.findUnique({
@@ -45,7 +51,7 @@ export async function POST(request: NextRequest) {
         id: Number(leadId),
       },
       data: {
-        handoverDate: today,
+        handoverDate: selectedDate,
         status: "CLOSED",
       },
     });
@@ -78,7 +84,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json(
         { newRev, message: "revenue create successfully" },
-        { status: 201 }
+        { status: 201 },
       );
     }
     //if present - update that one with the new count and profit
@@ -100,13 +106,13 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(
       { updLead, updRev, message: "revenue create successfully" },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     console.error("Error deleting vendor:", error);
     return NextResponse.json(
       { message: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

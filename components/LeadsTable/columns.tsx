@@ -13,7 +13,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import Link from "next/link";
+import { toast } from "@/hooks/use-toast";
 
 export type Lead = {
   id: number;
@@ -34,7 +46,78 @@ export type Lead = {
   updatedAt: string;
   init: boolean;
 };
+// const handleDelete = async (id: number) => {
 
+//   const confirmDelete = confirm("Are you sure you want to delete this lead?");
+
+//   if (!confirmDelete) return;
+
+//   try {
+//     const res = await fetch("/api/deleteLead", {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//       },
+//       body: JSON.stringify({ leadId: id }),
+//     });
+
+//     const data = await res.json();
+
+//     if (res.ok) {
+//       toast({
+//         title: "Deleted",
+//         description: "Lead deleted successfully",
+//       });
+
+//       // 🔥 refresh table
+//       window.location.reload();
+//     } else {
+//       toast({
+//         title: "Error",
+//         description: data.message,
+//       });
+//     }
+//   } catch (error) {
+//     toast({
+//       title: "Error",
+//       description: "Something went wrong",
+//     });
+//   }
+// };
+const handleDelete = async (id: number) => {
+  try {
+    const res = await fetch("/api/deleteLead", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ leadId: id }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      toast({
+        title: "Lead Deleted",
+        description: "The lead has been permanently removed.",
+      });
+
+      window.location.reload();
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Delete Failed",
+        description: data.message,
+      });
+    }
+  } catch (error) {
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description: "Something went wrong",
+    });
+  }
+};
 const columns: ColumnDef<Lead>[] = [
   {
     accessorKey: "lead_id",
@@ -193,14 +276,59 @@ const columns: ColumnDef<Lead>[] = [
               Copy Contact
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>View Lead</DropdownMenuItem>
+            {!lead.init && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem
+                    className="text-red-600"
+                    onSelect={(e) => e.preventDefault()} // 🔥 IMPORTANT
+                  >
+                    Delete Lead
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Delete Lead {lead.lead_id}?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete
+                      this lead and all its related data (transactions, items,
+                      vendors).
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+
+                    <AlertDialogAction
+                      className="bg-red-600 hover:bg-red-700"
+                      onClick={() => handleDelete(lead.id)}
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            {/* {!lead.init && (
+              <DropdownMenuItem
+                className="text-red-600"
+                onClick={() => handleDelete(lead.id)}
+              >
+                Delete Lead
+              </DropdownMenuItem>
+            )} */}
+
+            {/* <DropdownMenuItem>View Lead</DropdownMenuItem> */}
           </DropdownMenuContent>
         </DropdownMenu>
       );
     },
   },
 ];
-// this is for the colums section 
+// this is for the colums section
 // Function to dynamically filter columns based on pathname
 export const getColumns = () => {
   const pathname = usePathname(); // Get current route in Next.js

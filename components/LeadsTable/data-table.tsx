@@ -13,15 +13,19 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { format } from "date-fns";
+// ✅ CORRECT (Each icon listed only once)
 import { 
+  Activity,
+  CheckCircle2, 
+  Search, 
+  Users, 
+  Sparkles,
   CalendarIcon, 
   Download, 
-  Search, 
-  Filter, 
-  Users, 
-  Activity, 
-  Sparkles 
+  Filter,
+  Loader2 // If you are using it elsewhere
 } from "lucide-react";
+
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
@@ -55,6 +59,35 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
 }
 
+// 🎯 Function to get financial year range
+const getFinancialYearRange = (financialYear: string): DateRange | undefined => {
+  if (!financialYear || financialYear === "all") return undefined;
+  
+  const [startYear] = financialYear.split("-").map(Number);
+  const from = new Date(startYear, 3, 1); // April 1
+  const to = new Date(startYear + 1, 2, 31); // March 31 of next year
+  
+  return { from, to };
+};
+
+// 🎯 Function to generate financial years dynamically
+const generateFinancialYears = (): string[] => {
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  
+  // Determine current financial year
+  const currentFinancialYear = currentDate.getMonth() >= 3 ? currentYear : currentYear - 1;
+  
+  const years: string[] = [];
+  
+  // Generate from 2025-26 to current year + 10 years
+  for (let year = 2025; year <= currentFinancialYear ; year++) {
+    years.push(`${year}-${(year + 1).toString().slice(-2)}`);
+  }
+  
+  return years;
+};
+
 export function DataTable<TData, TValue>({
   columns,
   data,
@@ -66,6 +99,7 @@ export function DataTable<TData, TValue>({
     to: undefined,
   });
   const [isDatePopoverOpen, setIsDatePopoverOpen] = React.useState(false);
+  const [financialYear, setFinancialYear] = React.useState<string>("all");
   const pathname = usePathname();
   const [globalFilter, setGlobalFilter] = React.useState<string>("");
   const [statusFilter, setStatusFilter] = React.useState<string>(
@@ -79,6 +113,19 @@ export function DataTable<TData, TValue>({
     });
     return Array.from(uniqueStatuses);
   }, [data]);
+
+  // 🎯 Handle financial year change
+  const handleFinancialYearChange = (value: string) => {
+    setFinancialYear(value);
+    if (value === "all") {
+      setDateRange({ from: undefined, to: undefined });
+      setIsDatePopoverOpen(false);
+    } else {
+      const range = getFinancialYearRange(value);
+      setDateRange(range);
+      setIsDatePopoverOpen(false);
+    }
+  };
 
   const filteredData = React.useMemo(() => {
     let filtered = [...data];
@@ -113,7 +160,11 @@ export function DataTable<TData, TValue>({
     return {
       all: filteredData.length,
       fresh: filteredData.filter((item: any) => !item.init).length,
-      live: filteredData.filter((item: any) => item.status === "INPROGRESS" || item.status === "WON").length,
+      live: data.filter((item: any) => 
+      (item.status === "INPROGRESS" || item.status === "WON") && item.init === true
+    ).length,
+      // Add this line:
+    closed: filteredData.filter((item: any) => item.status === "CLOSED").length,
     };
   }, [filteredData]);
 
@@ -164,10 +215,10 @@ export function DataTable<TData, TValue>({
 
   return (
     // Replaced hardcoded black with adaptive background and text
-    <div className="space-y-6 p-4 bg-background text-foreground transition-colors">
+    <div className="w-full max-w-none mx-0 px-0 space-y-4 bg-background text-foreground transition-colors pt-0">
       
       {/* --- STATS SECTION --- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-l-4 border-l-muted-foreground shadow-sm">
           <CardContent className="flex items-center p-5">
             <div className="bg-muted p-3 rounded-full mr-4">
@@ -203,16 +254,28 @@ export function DataTable<TData, TValue>({
             </div>
           </CardContent>
         </Card>
+        {/* --- CLOSED LEADS CARD --- */}
+<Card className="border-l-4 border-l-violet-600 shadow-sm">
+  <CardContent className="flex items-center p-5">
+    <div className="bg-violet-100 dark:bg-violet-900/20 p-3 rounded-full mr-4">
+      <CheckCircle2 className="h-5 w-5 text-violet-600" />
+    </div>
+    <div>
+      <p className="text-xs font-semibold text-muted-foreground uppercase">Closed Leads</p>
+      <h3 className="text-2xl font-bold text-violet-600">{stats.closed}</h3>
+    </div>
+  </CardContent>
+</Card>
       </div>
 
       {/* --- FILTERS BAR --- */}
-      <div className="flex items-center py-4 gap-4 flex-wrap bg-card p-4 rounded-xl border shadow-sm transition-colors">
+      <div className="flex items-center py-4 gap-2 flex-wrap bg-card p-4 rounded-xl border shadow-sm transition-colors">
         <Button 
           variant="outline" 
           onClick={exportToExcel} 
           className="shadow-sm"
         >
-          <Download className="h-4 w-4 mr-2" /> Export
+          <Download className="h-4 w-4 mr-2" /> 
         </Button>
 
         <div className="relative max-w-xs flex-1">
@@ -224,6 +287,22 @@ export function DataTable<TData, TValue>({
             className="pl-10"
           />
         </div>
+
+        {/* 🎯 FINANCIAL YEAR FILTER */}
+        <Select value={financialYear} onValueChange={handleFinancialYearChange}>
+          <SelectTrigger className="w-[180px]">
+            <div className="flex items-center">
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Financial Year" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Years</SelectItem>
+            {generateFinancialYears().map((year) => (
+              <SelectItem key={year} value={year}>{year}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <Select value={statusFilter || "status"} onValueChange={(v) => setStatusFilter(v === "status" ? "" : v)}>
           <SelectTrigger className="w-[180px]">

@@ -210,94 +210,85 @@ export default function Dashboard() {
       };
     }
 
-    // For store manager, we need to structure the data differently
+    /**
+     * Helper to enforce your new formulas:
+     * 1. Gross Profit = Revenue - Vendor Payments
+     * 2. Total Profit = Gross Profit - Store Expenses
+     */
+    const calculateMetrics = (item: any) => {
+      const revenue = Number(item.revenue) || 0;
+      const vendorPayments = Number(item.totalVendorPayments) || 0;
+      const storeExpenses = Number(item.totalExpenses) || 0;
+
+      const grossProfit = revenue - vendorPayments;
+      const netTotalProfit = grossProfit - storeExpenses;
+
+      return {
+        ...item,
+        revenue,
+        totalVendorPayments: vendorPayments,
+        totalExpenses: storeExpenses,
+        grossProfit: grossProfit, // New field for your UI
+        totalProfit: netTotalProfit, // Overwriting API totalProfit with your custom logic
+      };
+    };
+
+    // 1. Logic for STORE_MANAGER
     if (isStoreManager) {
       const storeRevenueData =
-        data.monthWiseRevenue?.map((item: any) => ({
-          month: item.monthYear || item.month,
-          revenue: item.revenue,
-          totalProfit: item.totalProfit,
-          projectClose: item.projectClose,
-          totalProjects: item.totalProjects || 0,
-          totalVendorPayments: item.totalVendorPayments ?? 0, // Use nullish coalescing
-          totalExpenses: item.totalExpenses || 0,
-          cash: item.cash || 0,
-          online: item.online || 0,
-          receiveCash: item.receiveCash || 0,
-          receiveOnline: item.receiveOnline || 0,
-          payInCash: item.payInCash || 0,
-          payInOnline: item.payInOnline || 0,
-        })) || [];
+        data.monthWiseRevenue?.map((item: any) => 
+          calculateMetrics({
+            ...item,
+            month: item.monthYear || item.month,
+          })
+        ) || [];
+
+      const storeFinYearData = 
+        data.finYearWiseRevenue?.map((item: any) => calculateMetrics(item)) || [];
 
       return {
         revenueData: storeRevenueData,
         userStoreWiseRevenue: {},
-        finYearData:
-          data.finYearWiseRevenue?.map((item: any) => ({
-            finYear: item.finYear,
-            totalProfit: item.totalProfit,
-            revenue: item.revenue,
-            projectClose: item.projectClose,
-            totalProjects: item.totalProjects || 0,
-            totalVendorPayments: item.totalVendorPayments ?? 0, // Use nullish coalescing
-            totalExpenses: item.totalExpenses || 0,
-            cash: item.cash || 0,
-            online: item.online || 0,
-            receiveCash: item.receiveCash || 0,
-            receiveOnline: item.receiveOnline || 0,
-            payInCash: item.payInCash || 0,
-            payInOnline: item.payInOnline || 0,
-          })) || [],
+        finYearData: storeFinYearData,
         storeData: [],
       };
     }
 
-    // Original admin data transformation
+    // 2. Logic for ADMIN / SUPER_HEAD
     const finYearData: FinYearData[] =
-      data.finYearWiseRevenue?.map((item: any) => ({
-        finYear: item.finYear,
-        totalProfit: item.totalProfit,
-        revenue: item.revenue,
-        projectClose: item.projectClose,
-        totalProjects: item.totalProjects || 0,
-        totalVendorPayments: item.totalVendorPayments ?? 0, // Use nullish coalescing
-        totalExpenses: item.totalExpenses || 0,
-        cash: item.cash || 0,
-        online: item.online || 0,
-        receiveCash: item.receiveCash || 0,
-        receiveOnline: item.receiveOnline || 0,
-        payInCash: item.payInCash || 0,
-        payInOnline: item.payInOnline || 0,
-      })) || [];
+      data.finYearWiseRevenue?.map((item: any) => calculateMetrics(item)) || [];
 
     const userStoreWiseRevenue =
       data.userStoreWiseRevenue?.reduce(
         (acc: Record<string, StoreData>, item: any) => {
           const key = `${item.userId}-${item.store}`;
-          acc[key] = {
+          acc[key] = calculateMetrics({
             userId: item.userId,
             store: item.store,
             revenue: item.revenue,
-            totalProfit: item.totalProfit,
-            projectClose: item.projectClose,
-            cash: item.cash,
-            online: item.online,
-            receiveCash: item.receiveCash,
-            receiveOnline: item.receiveOnline,
-            payInCash: item.payInCash,
-            payInOnline: item.payInOnline,
+            totalVendorPayments: item.totalVendorPayments,
             totalExpenses: item.totalExpenses,
-          };
+            projectClose: item.projectClose,
+          });
           return acc;
         },
         {}
       ) || {};
 
+    // Transforming the comparison storeData array
+    const transformedStoreData = data.storeData?.map((store: any) => ({
+      ...store,
+      yearly: store.yearly?.map((y: any) => calculateMetrics(y)),
+      monthly: store.monthly?.map((m: any) => calculateMetrics(m)),
+      quarterly: store.quarterly?.map((q: any) => calculateMetrics(q)),
+      financialYear: store.financialYear?.map((fy: any) => calculateMetrics(fy)),
+    })) || [];
+
     return {
-      revenueData: data.monthWiseRevenue || [],
+      revenueData: data.monthWiseRevenue?.map((item: any) => calculateMetrics(item)) || [],
       userStoreWiseRevenue,
       finYearData,
-      storeData: data.storeData || [],
+      storeData: transformedStoreData,
     };
   };
 
@@ -715,12 +706,7 @@ export default function Dashboard() {
                       {formatNumber(
                         isStoreManager
                           ? data.totalRevenue
-                          : timeframe === "financial"
-                          ? data.totalRevenue || 0
-                          : filteredData.reduce(
-                              (acc, item) => acc + item.revenue,
-                              0
-                            )
+                          : filteredData.reduce((acc, item) => acc + item.revenue, 0)
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
@@ -729,12 +715,7 @@ export default function Dashboard() {
                         {calculateGrowth(
                           isStoreManager
                             ? data.totalRevenue
-                            : timeframe === "financial"
-                            ? data.totalRevenue || 0
-                            : filteredData.reduce(
-                                (acc, item) => acc + item.revenue,
-                                0
-                              ),
+                            : filteredData.reduce((acc, item) => acc + item.revenue, 0),
                           previousData.revenue
                         )}
                       </span>{" "}
@@ -762,22 +743,35 @@ export default function Dashboard() {
                       <div className="text-2xl font-bold">
                         ₹
                         {formatNumber(
-                          timeframe === "financial"
-                            ? (selectedFinYearData?.totalVendorPayments || 0) +
-                                (selectedFinYearData?.totalExpenses || 0)
-                            : filteredData.reduce(
-                                (acc, item) =>
-                                  acc +
-                                  (item.totalVendorPayments || 0) +
-                                  (item.totalExpenses || 0),
-                                0
-                              )
+                          filteredData.reduce(
+                            (acc, item) =>
+                              acc +
+                              (item.totalVendorPayments || 0) +
+                              (item.totalExpenses || 0),
+                            0
+                          )
                         )}
                       </div>
 
                       <p className="text-xs text-muted-foreground mt-1">
                         Your total expenses
                       </p>
+                    </CardContent>
+                  </Card>
+                )}
+                {activeTab === "handover" && (
+                  <Card className="shadow-sm border-t-4 ">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Gross Profit
+                      </CardTitle>
+                      <TrendingUp className="h-4 w-4" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold ">
+                        ₹{formatNumber(filteredData.reduce((acc, item) => acc + (item.grossProfit || 0), 0))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">Margin after material</p>
                     </CardContent>
                   </Card>
                 )}
@@ -798,12 +792,7 @@ export default function Dashboard() {
                         {formatNumber(
                           isStoreManager
                             ? data.totalProfit
-                            : timeframe === "financial" && selectedFinYearData
-                            ? selectedFinYearData.totalProfit || 0
-                            : filteredData.reduce(
-                                (acc, item) => acc + item.totalProfit,
-                                0
-                              )
+                            : filteredData.reduce((acc, item) => acc + item.totalProfit, 0)
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
@@ -812,12 +801,7 @@ export default function Dashboard() {
                           {calculateGrowth(
                             isStoreManager
                               ? data.totalProfit
-                              : timeframe === "financial" && selectedFinYearData
-                              ? selectedFinYearData.totalProfit || 0
-                              : filteredData.reduce(
-                                  (acc, item) => acc + item.totalProfit,
-                                  0
-                                ),
+                              : filteredData.reduce((acc, item) => acc + item.totalProfit, 0),
                             previousData.totalProfit
                           )}
                         </span>{" "}
@@ -834,27 +818,6 @@ export default function Dashboard() {
                   </Card>
                 )}
                 {/* Projects Closed/Live - shown in both tabs with conditional title */}
-                {/* <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Projects Live
-                    </CardTitle>
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {timeframe === "financial"
-                        ? selectedFinYearData?.totalProjects || 0
-                        : filteredData.reduce(
-                            (acc, item) => acc + (item.totalProjects || 0),
-                            0
-                          )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Currently active projects
-                    </p>
-                  </CardContent>
-                </Card> */}
                 {activeTab === "handover" && (
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -865,12 +828,10 @@ export default function Dashboard() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
-                        {timeframe === "financial"
-                          ? selectedFinYearData?.projectClose || 0
-                          : filteredData.reduce(
-                              (acc, item) => acc + (item.projectClose || 0),
-                              0
-                            )}
+                        {filteredData.reduce(
+                          (acc, item) => acc + (item.projectClose || 0),
+                          0
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         Successfully completed projects
@@ -888,15 +849,13 @@ export default function Dashboard() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
-                        {timeframe === "financial"
-                          ? selectedFinYearData?.totalProjects || 0
-                          : filteredData.reduce(
-                              (acc, item) => acc + (item.totalProjects || 0),
-                              0
-                            )}
+                        {filteredData.reduce(
+                          (acc, item) => acc + (item.totalProjects || 0),
+                          0
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Successfully completed projects
+                        Currently active projects
                       </p>
                     </CardContent>
                   </Card>
@@ -913,13 +872,11 @@ export default function Dashboard() {
                       <div className="text-2xl font-bold">
                         ₹
                         {formatNumber(
-                          timeframe === "financial"
-                            ? selectedFinYearData?.totalVendorPayments || 0
-                            : filteredData.reduce(
-                                (acc, item) =>
-                                  acc + (item.totalVendorPayments || 0),
-                                0
-                              )
+                          filteredData.reduce(
+                            (acc, item) =>
+                              acc + (item.totalVendorPayments || 0),
+                            0
+                          )
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -940,12 +897,10 @@ export default function Dashboard() {
                       <div className="text-2xl font-bold">
                         ₹
                         {formatNumber(
-                          timeframe === "financial"
-                            ? selectedFinYearData?.totalExpenses || 0
-                            : filteredData.reduce(
-                                (acc, item) => acc + (item.totalExpenses || 0),
-                                0
-                              )
+                          filteredData.reduce(
+                            (acc, item) => acc + (item.totalExpenses || 0),
+                            0
+                          )
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -959,54 +914,6 @@ export default function Dashboard() {
               {/* Payment methods - only shown in ongoing tab */}
               {activeTab === "ongoing" && (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-6">
-                  {/* <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Pay in Cash
-                      </CardTitle>
-                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        ₹
-                        {formatNumber(
-                          timeframe === "financial"
-                            ? selectedFinYearData?.payInCash || 0
-                            : filteredData.reduce(
-                                (acc, item) => acc + (item.payInCash || 0),
-                                0
-                              )
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Total cash payments
-                      </p>
-                    </CardContent>
-                  </Card> */}
-                  {/* <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Pay Online
-                      </CardTitle>
-                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        ₹
-                        {formatNumber(
-                          timeframe === "financial"
-                            ? selectedFinYearData?.payInOnline || 0
-                            : filteredData.reduce(
-                                (acc, item) => acc + (item.payInOnline || 0),
-                                0
-                              )
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Total online payments
-                      </p>
-                    </CardContent>
-                  </Card> */}
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-medium">
@@ -1018,12 +925,10 @@ export default function Dashboard() {
                       <div className="text-2xl font-bold">
                         ₹
                         {formatNumber(
-                          timeframe === "financial"
-                            ? selectedFinYearData?.receiveCash || 0
-                            : filteredData.reduce(
-                                (acc, item) => acc + (item.receiveCash || 0),
-                                0
-                              )
+                          filteredData.reduce(
+                            (acc, item) => acc + (item.receiveCash || 0),
+                            0
+                          )
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -1042,12 +947,10 @@ export default function Dashboard() {
                       <div className="text-2xl font-bold">
                         ₹
                         {formatNumber(
-                          timeframe === "financial"
-                            ? selectedFinYearData?.receiveOnline || 0
-                            : filteredData.reduce(
-                                (acc, item) => acc + (item.receiveOnline || 0),
-                                0
-                              )
+                          filteredData.reduce(
+                            (acc, item) => acc + (item.receiveOnline || 0),
+                            0
+                          )
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -1066,16 +969,13 @@ export default function Dashboard() {
                       <div className="text-2xl font-bold">
                         ₹
                         {formatNumber(
-                          timeframe === "financial"
-                            ? (selectedFinYearData?.receiveOnline || 0) +
-                                (selectedFinYearData?.receiveCash || 0)
-                            : filteredData.reduce(
-                                (acc, item) =>
-                                  acc +
-                                  (item.receiveOnline || 0) +
-                                  (item.receiveCash || 0),
-                                0
-                              )
+                          filteredData.reduce(
+                            (acc, item) =>
+                              acc +
+                              (item.receiveOnline || 0) +
+                              (item.receiveCash || 0),
+                            0
+                          )
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -1169,7 +1069,6 @@ export default function Dashboard() {
                 </Card>
               )}
 
-              {/* Charts */}
               {/* Charts */}
               {timeframe !== "monthly" && timeframe !== "financial" && (
                 <div className="mt-6 grid gap-6 lg:grid-cols-2">
