@@ -245,20 +245,10 @@ export default function Dashboard() {
 
       const storeFinYearData = 
         data.finYearWiseRevenue?.map((item: any) => calculateMetrics(item)) || [];
-        data.monthWiseRevenue?.map((item: any) => 
-          calculateMetrics({
-            ...item,
-            month: item.monthYear || item.month,
-          })
-        ) || [];
-
-      const storeFinYearData = 
-        data.finYearWiseRevenue?.map((item: any) => calculateMetrics(item)) || [];
 
       return {
         revenueData: storeRevenueData,
         userStoreWiseRevenue: {},
-        finYearData: storeFinYearData,
         finYearData: storeFinYearData,
         storeData: [],
       };
@@ -267,22 +257,17 @@ export default function Dashboard() {
     // 2. Logic for ADMIN / SUPER_HEAD
     const finYearData: FinYearData[] =
       data.finYearWiseRevenue?.map((item: any) => calculateMetrics(item)) || [];
-      data.finYearWiseRevenue?.map((item: any) => calculateMetrics(item)) || [];
 
     const userStoreWiseRevenue =
       data.userStoreWiseRevenue?.reduce(
         (acc: Record<string, StoreData>, item: any) => {
           const key = `${item.userId}-${item.store}`;
           acc[key] = calculateMetrics({
-          
             userId: item.userId,
             store: item.store,
             revenue: item.revenue,
             totalVendorPayments: item.totalVendorPayments,
-            totalVendorPayments: item.totalVendorPayments,
             totalExpenses: item.totalExpenses,
-            projectClose: item.projectClose,
-          });
             projectClose: item.projectClose,
           });
           return acc;
@@ -299,21 +284,10 @@ export default function Dashboard() {
       financialYear: store.financialYear?.map((fy: any) => calculateMetrics(fy)),
     })) || [];
 
-    // Transforming the comparison storeData array
-    const transformedStoreData = data.storeData?.map((store: any) => ({
-      ...store,
-      yearly: store.yearly?.map((y: any) => calculateMetrics(y)),
-      monthly: store.monthly?.map((m: any) => calculateMetrics(m)),
-      quarterly: store.quarterly?.map((q: any) => calculateMetrics(q)),
-      financialYear: store.financialYear?.map((fy: any) => calculateMetrics(fy)),
-    })) || [];
-
     return {
-      revenueData: data.monthWiseRevenue?.map((item: any) => calculateMetrics(item)) || [],
       revenueData: data.monthWiseRevenue?.map((item: any) => calculateMetrics(item)) || [],
       userStoreWiseRevenue,
       finYearData,
-      storeData: transformedStoreData,
       storeData: transformedStoreData,
     };
   };
@@ -717,7 +691,7 @@ export default function Dashboard() {
               </div>
 
               {/* Top metrics - modified for tab-specific display */}
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 {/* Total Revenue - shown in both tabs */}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -935,7 +909,6 @@ export default function Dashboard() {
                     </CardContent>
                   </Card>
                 )}
-                
               </div>
 
               {/* Payment methods - only shown in ongoing tab */}
