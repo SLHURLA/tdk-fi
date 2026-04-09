@@ -274,7 +274,7 @@ export default function Dashboard() {
         (acc: Record<string, StoreData>, item: any) => {
           const key = `${item.userId}-${item.store}`;
           acc[key] = calculateMetrics({
-          acc[key] = calculateMetrics({
+          
             userId: item.userId,
             store: item.store,
             revenue: item.revenue,
