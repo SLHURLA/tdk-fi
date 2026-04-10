@@ -62,8 +62,6 @@ interface PriceBreakdownProps {
   onDataUpdate: () => void;
 }
 
-type GstMode = "INCLUSIVE" | "EXCLUSIVE";
-
 const PriceBreakdown = ({
   priceBreakdown: initialPriceBreakdown,
   closedLead,
@@ -85,157 +83,200 @@ const PriceBreakdown = ({
   const [totalAmount, setTotalAmount] = useState<number | "">("");
   const [bankPayments, setBankPayments] = useState<number | "">("");
   const [cashPayments, setCashPayments] = useState<number | "">("");
-  const [gstPercentage, setGstPercentage] = useState<number | "">("");
+  const [gstPercentage, setGstPercentage] = useState<number | "">(18);
   const [gstAmount, setGstAmount] = useState<number | "">("");
   const [brand, setBrand] = useState<string>("");
   const [model, setModel] = useState<string>("");
   const [remark, setRemark] = useState<string>("");
-  const [gstMode, setGstMode] = useState<GstMode>("INCLUSIVE");
   const [lastEditedGstField, setLastEditedGstField] = useState<
     "percentage" | "amount" | null
-  >(null);
+  >("percentage");
 
   /* ================= PARTICULARS ================= */
+  const mainParticulars = Object.values(AreaType).filter(
+    (area) =>
+      !["Counter_top", "Appliances", "Sink", "Installation"].includes(area)
+  );
 
-// Main items particulars - NOT in AdditionalItemsList
-const mainParticulars = Object.values(AreaType).filter(
-  (area) =>
-    !["Counter_top", "Appliances", "Sink", "Installation"].includes(area)
-);
+  const additionalParticulars = Object.values(AdditionalItemsList);
 
-      // Additional items particulars
-      const additionalParticulars = Object.values(AdditionalItemsList);
+  const currentParticulars =
+    activeTab === "main" ? mainParticulars : additionalParticulars;
 
-      // Active tab particulars
-      const currentParticulars =
-        activeTab === "main" ? mainParticulars : additionalParticulars;
+  /* ================= GST CALCULATION - INCLUSIVE ================= */
+  // useEffect to handle GST percentage changes
+  useEffect(() => {
+    if (lastEditedGstField === "percentage" && gstPercentage !== "") {
+      const bank = Number(bankPayments) || 0;
+      if (bank <= 0) {
+        setGstAmount(0);
+        return;
+      }
 
-      /* ================= GST CALCULATION (BANK EXCLUSIVE) ================= */
+      const pct = Number(gstPercentage);
+      // INCLUSIVE: GST Amount = Bank × (GST% ÷ (100 + GST%))
+      const gst = bank * (pct / (100 + pct));
+      setGstAmount(Number(gst.toFixed(2)));
+    }
+  }, [gstPercentage, bankPayments, lastEditedGstField]);
 
-      const recalculateGstOnBank = (
-        editedField: "percentage" | "amount",
-        bank: number
-      ) => {
-        if (!bank || bank <= 0) {
-          setGstAmount(0);
-          return;
+  // useEffect to handle GST amount changes
+  useEffect(() => {
+    if (lastEditedGstField === "amount" && gstAmount !== "") {
+      const bank = Number(bankPayments) || 0;
+      const amt = Number(gstAmount);
+
+      if (bank <= 0 || amt <= 0) {
+        setGstPercentage(0);
+        return;
+      }
+
+      // INCLUSIVE: GST% = (GST Amount ÷ (Bank - GST Amount)) × 100
+      const baseAmount = bank - amt;
+      if (baseAmount <= 0) {
+        setGstPercentage(0);
+        return;
+      }
+
+      const pct = (amt / baseAmount) * 100;
+      setGstPercentage(Number(pct.toFixed(2)));
+    }
+  }, [gstAmount, bankPayments, lastEditedGstField]);
+
+  /* ================= PAYMENT HANDLERS ================= */
+
+  // Handle cash payment change
+  const handleCashChange = (value: number | "") => {
+    setCashPayments(value);
+
+    if (totalAmount !== "" && value !== "") {
+      const bank = Number(totalAmount) - Number(value);
+      const safeBank = bank >= 0 ? bank : 0;
+      setBankPayments(safeBank);
+
+      // Recalculate GST if field was previously edited
+      if (lastEditedGstField === "percentage" && gstPercentage !== "") {
+        const pct = Number(gstPercentage);
+        const gst = safeBank * (pct / (100 + pct));
+        setGstAmount(Number(gst.toFixed(2)));
+      } else if (lastEditedGstField === "amount" && gstAmount !== "") {
+        const amt = Number(gstAmount);
+        if (safeBank > amt) {
+          const baseAmount = safeBank - amt;
+          const pct = (amt / baseAmount) * 100;
+          setGstPercentage(Number(pct.toFixed(2)));
         }
+      }
+    } else if (value === "") {
+      setBankPayments(totalAmount);
+    }
+  };
 
-        const pct = Number(gstPercentage) || 0;
-        const amt = Number(gstAmount) || 0;
+  // Handle bank payment change
+  const handleBankChange = (value: number | "") => {
+    setBankPayments(value);
 
-        // GST calculated ONLY on bank payment
-        if (editedField === "percentage") {
-          // const gst = (bank * pct) / 100;
-          const gst = bank * (pct / (100 + pct));
+    if (totalAmount !== "" && value !== "") {
+      const cash = Number(totalAmount) - Number(value);
+      setCashPayments(cash >= 0 ? cash : 0);
+
+      // Recalculate GST if field was previously edited
+      if (lastEditedGstField === "percentage" && gstPercentage !== "") {
+        const pct = Number(gstPercentage);
+        const bank = Number(value);
+        const gst = bank * (pct / (100 + pct));
+        setGstAmount(Number(gst.toFixed(2)));
+      } else if (lastEditedGstField === "amount" && gstAmount !== "") {
+        const amt = Number(gstAmount);
+        const bank = Number(value);
+        if (bank > amt) {
+          const baseAmount = bank - amt;
+          const pct = (amt / baseAmount) * 100;
+          setGstPercentage(Number(pct.toFixed(2)));
+        }
+      }
+    } else if (value === "") {
+      setCashPayments(totalAmount);
+    }
+  };
+
+  // Handle total amount change
+  const handleTotalChange = (value: number | "") => {
+    setTotalAmount(value);
+
+    if (value === "") {
+      setBankPayments("");
+      setCashPayments("");
+      setGstAmount(0);
+      return;
+    }
+
+    const total = Number(value);
+
+    // Maintain split ratio if both payments are set
+    if (bankPayments !== "" && cashPayments !== "") {
+      const prevTotal = Number(bankPayments) + Number(cashPayments);
+
+      if (prevTotal > 0) {
+        const newBank = (Number(bankPayments) / prevTotal) * total;
+        const newCash = total - newBank;
+
+        const roundedBank = Number(newBank.toFixed(2));
+        setBankPayments(roundedBank);
+        setCashPayments(Number(newCash.toFixed(2)));
+
+        // Recalculate GST based on new bank amount
+        if (lastEditedGstField === "percentage" && gstPercentage !== "") {
+          const pct = Number(gstPercentage);
+          const gst = roundedBank * (pct / (100 + pct));
           setGstAmount(Number(gst.toFixed(2)));
-        }
-
-        if (editedField === "amount") {
-          const calculatedPct = (amt / bank) * 100;
-          setGstPercentage(Number(calculatedPct.toFixed(2)));
-        }
-      };
-
-      /* ================= PAYMENT HANDLERS ================= */
-
-      // Cash payment change
-      const handleCashChange = (value: number | "") => {
-        setCashPayments(value);
-
-        if (totalAmount !== "" && value !== "") {
-          const bank = Number(totalAmount) - Number(value);
-          const safeBank = bank >= 0 ? bank : 0;
-          setBankPayments(safeBank);
-
-          if (lastEditedGstField) {
-            recalculateGstOnBank(lastEditedGstField, safeBank);
-          }
-        } else if (value === "") {
-          setBankPayments(totalAmount);
-        }
-      };
-
-      // Bank payment change
-      const handleBankChange = (value: number | "") => {
-        setBankPayments(value);
-
-        if (totalAmount !== "" && value !== "") {
-          const cash = Number(totalAmount) - Number(value);
-          setCashPayments(cash >= 0 ? cash : 0);
-
-          if (lastEditedGstField) {
-            recalculateGstOnBank(lastEditedGstField, Number(value));
-          }
-        } else if (value === "") {
-          setCashPayments(totalAmount);
-        }
-      };
-
-      // Total amount change
-      const handleTotalChange = (value: number | "") => {
-        setTotalAmount(value);
-
-        if (value === "") {
-          setBankPayments("");
-          setCashPayments("");
-          setGstAmount(0);
-          return;
-        }
-
-        const total = Number(value);
-
-        // Maintain split ratio
-        if (bankPayments !== "" && cashPayments !== "") {
-          const prevTotal = Number(bankPayments) + Number(cashPayments);
-
-          if (prevTotal > 0) {
-            const newBank = (Number(bankPayments) / prevTotal) * total;
-            const newCash = total - newBank;
-
-            const roundedBank = Number(newBank.toFixed(2));
-            setBankPayments(roundedBank);
-            setCashPayments(Number(newCash.toFixed(2)));
-
-            if (lastEditedGstField) {
-              recalculateGstOnBank(lastEditedGstField, roundedBank);
-            }
-          } else {
-            setBankPayments(total);
-            setCashPayments(0);
-          }
-        } else {
-          setBankPayments(total);
-          setCashPayments(0);
-
-          if (lastEditedGstField) {
-            recalculateGstOnBank(lastEditedGstField, total);
+        } else if (lastEditedGstField === "amount" && gstAmount !== "") {
+          const amt = Number(gstAmount);
+          if (roundedBank > amt) {
+            const baseAmount = roundedBank - amt;
+            const pct = (amt / baseAmount) * 100;
+            setGstPercentage(Number(pct.toFixed(2)));
           }
         }
-      };
+      } else {
+        setBankPayments(total);
+        setCashPayments(0);
+      }
+    } else if (bankPayments !== "") {
+      const bank = Number(bankPayments);
+      if (bank > total) {
+        setBankPayments(total);
+        setCashPayments(0);
+      } else {
+        setCashPayments(total - bank);
+      }
+    } else if (cashPayments !== "") {
+      const cash = Number(cashPayments);
+      if (cash > total) {
+        setCashPayments(total);
+        setBankPayments(0);
+      } else {
+        setBankPayments(total - cash);
+      }
+    } else {
+      setBankPayments(total);
+      setCashPayments(0);
+    }
+  };
 
-      /* ================= GST INPUT HANDLERS ================= */
+  /* ================= GST INPUT HANDLERS ================= */
 
-      // GST Percentage change
-      const handleGstPercentageChange = (value: number | "") => {
-        setGstPercentage(value);
-        setLastEditedGstField("percentage");
+  const handleGstPercentageChange = (value: number | "") => {
+    setGstPercentage(value);
+    setLastEditedGstField("percentage");
+  };
 
-        if (value !== "" && bankPayments !== "") {
-          recalculateGstOnBank("percentage", Number(bankPayments));
-        }
-      };
+  const handleGstAmountChange = (value: number | "") => {
+    setGstAmount(value);
+    setLastEditedGstField("amount");
+  };
 
-      // GST Amount change
-      const handleGstAmountChange = (value: number | "") => {
-        setGstAmount(value);
-        setLastEditedGstField("amount");
-
-        if (value !== "" && bankPayments !== "") {
-          recalculateGstOnBank("amount", Number(bankPayments));
-        }
-      };
-
+  /* ================= DELETE HANDLERS ================= */
 
   const handleDelete = async (itemId: string) => {
     setIsLoading(true);
@@ -288,6 +329,8 @@ const mainParticulars = Object.values(AreaType).filter(
     setItemToDelete(null);
   };
 
+  /* ================= VALIDATION ================= */
+
   const validateAmounts = (): boolean => {
     const bank = Number(bankPayments) || 0;
     const cash = Number(cashPayments) || 0;
@@ -323,6 +366,8 @@ const mainParticulars = Object.values(AreaType).filter(
 
     return true;
   };
+
+  /* ================= ADD ITEM ================= */
 
   const handleAddProvidedItem = async () => {
     if (!areaType) {
@@ -377,7 +422,7 @@ const mainParticulars = Object.values(AreaType).filter(
 
       toast({
         title: "Success",
-        description: "Item added successfully.",
+        description: "Item added successfully. (GST is inclusive of bank payment)",
         variant: "default",
       });
     } catch (error) {
@@ -392,28 +437,37 @@ const mainParticulars = Object.values(AreaType).filter(
     }
   };
 
+  /* ================= EDIT ITEM ================= */
+
   const handleEditItem = (item: ProvidedItem) => {
     setEditingItemId(item.id);
     setAreaType(item.area);
     const totalAmt = (item.payInCash || 0) + (item.payInOnline || 0);
+    const bankPayment = item.payInOnline || 0;
+
     setTotalAmount(totalAmt);
-    setBankPayments(item.payInOnline || 0);
+    setBankPayments(bankPayment);
     setCashPayments(item.payInCash || 0);
     setGstAmount(item.gst || 0);
 
-    // Calculate GST percentage based on the GST amount and total amount
-    if (totalAmt > 0 && item.gst > 0) {
-      const baseAmount = totalAmt - item.gst;
-      const calculatedPercentage = (item.gst / baseAmount) * 100;
-      setGstPercentage(Number(calculatedPercentage.toFixed(2)));
+    // Calculate GST percentage from GST amount using INCLUSIVE formula
+    if (bankPayment > 0 && item.gst > 0) {
+      const baseAmount = bankPayment - item.gst;
+      if (baseAmount > 0) {
+        const calculatedPercentage = (item.gst / baseAmount) * 100;
+        setGstPercentage(Number(calculatedPercentage.toFixed(2)));
+      } else {
+        setGstPercentage(18);  // Default to 18%
+      }
     } else {
-      setGstPercentage("");
+      setGstPercentage(18);  // Default to 18%
     }
 
     setBrand(item.brand || "");
     setModel(item.model || "");
     setRemark(item.remark || "");
     setIsEditDialogOpen(true);
+    setLastEditedGstField("percentage");
   };
 
   const handleUpdateProvidedItem = async () => {
@@ -459,7 +513,6 @@ const mainParticulars = Object.values(AreaType).filter(
 
       onDataUpdate();
 
-      // Update the item in the local state
       setPriceBreakdown((prevItems) =>
         prevItems.map((item) =>
           item.id === editingItemId
@@ -484,7 +537,7 @@ const mainParticulars = Object.values(AreaType).filter(
 
       toast({
         title: "Success",
-        description: "Item updated successfully.",
+        description: "Item updated successfully. (GST is inclusive of bank payment)",
         variant: "default",
       });
     } catch (error) {
@@ -504,12 +557,12 @@ const mainParticulars = Object.values(AreaType).filter(
     setTotalAmount("");
     setBankPayments("");
     setCashPayments("");
-    setGstPercentage("");
+    setGstPercentage(18);  // Default to 18%
     setGstAmount("");
     setBrand("");
     setModel("");
     setRemark("");
-    setLastEditedGstField(null);
+    setLastEditedGstField("percentage");  // Set to percentage by default
   };
 
   return (
@@ -532,7 +585,7 @@ const mainParticulars = Object.values(AreaType).filter(
                 <DialogTitle>Book an Item</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-2">
-                {/* Add tabs for main/additional items */}
+                {/* Tabs for main/additional items */}
                 <Tabs
                   value={activeTab}
                   onValueChange={(value) =>
@@ -552,11 +605,7 @@ const mainParticulars = Object.values(AreaType).filter(
                   <Label htmlFor="areaType">Particulars</Label>
                   <Select value={areaType} onValueChange={setAreaType}>
                     <SelectTrigger>
-                      <SelectValue
-                        placeholder={`Select ${
-                          activeTab === "main" ? "item" : "item"
-                        }`}
-                      />
+                      <SelectValue placeholder="Select item" />
                     </SelectTrigger>
                     <SelectContent>
                       {currentParticulars.map((type) => (
@@ -620,9 +669,12 @@ const mainParticulars = Object.values(AreaType).filter(
                         handleGstPercentageChange(Number(e.target.value) || "")
                       }
                     />
+                    <p className="text-xs text-blue-600 font-semibold">
+                      GST is inclusive of bank payment
+                    </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="gstAmount">GST Amount ₹</Label>
+                    <Label htmlFor="gstAmount">GST Amount (₹)</Label>
                     <Input
                       id="gstAmount"
                       type="number"
@@ -632,8 +684,9 @@ const mainParticulars = Object.values(AreaType).filter(
                         handleGstAmountChange(Number(e.target.value) || "")
                       }
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                    GST is calculated only on the bank payment amount.</p>
+                    <p className="text-xs text-blue-600 font-semibold">
+                      Calculated: ₹{Number(gstAmount || 0).toFixed(2)}
+                    </p>
                   </div>
                 </div>
 
@@ -760,7 +813,7 @@ const mainParticulars = Object.values(AreaType).filter(
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="areaType">Area Type</Label>
+              <Label htmlFor="editAreaType">Area Type</Label>
               <Select value={areaType} onValueChange={setAreaType}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select Area Type" />
@@ -776,21 +829,23 @@ const mainParticulars = Object.values(AreaType).filter(
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="totalAmount">Total Amount (₹)</Label>
+              <Label htmlFor="editTotalAmount">Total Amount (₹)</Label>
               <Input
-                id="totalAmount"
+                id="editTotalAmount"
                 type="number"
                 placeholder="0.00"
                 value={totalAmount}
-                onChange={(e) => setTotalAmount(Number(e.target.value) || "")}
+                onChange={(e) =>
+                  handleTotalChange(Number(e.target.value) || "")
+                }
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="bankPayments">Bank Payments (₹)</Label>
+                <Label htmlFor="editBankPayments">Bank Payments (₹)</Label>
                 <Input
-                  id="bankPayments"
+                  id="editBankPayments"
                   type="number"
                   placeholder="0.00"
                   value={bankPayments}
@@ -800,9 +855,9 @@ const mainParticulars = Object.values(AreaType).filter(
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cashPayments">Cash Payments (₹)</Label>
+                <Label htmlFor="editCashPayments">Cash Payments (₹)</Label>
                 <Input
-                  id="cashPayments"
+                  id="editCashPayments"
                   type="number"
                   placeholder="0.00"
                   value={cashPayments}
@@ -815,9 +870,9 @@ const mainParticulars = Object.values(AreaType).filter(
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="gstPercentage">GST Percentage (%)</Label>
+                <Label htmlFor="editGstPercentage">GST Percentage (%)</Label>
                 <Input
-                  id="gstPercentage"
+                  id="editGstPercentage"
                   type="number"
                   placeholder="0.00"
                   value={gstPercentage}
@@ -825,11 +880,14 @@ const mainParticulars = Object.values(AreaType).filter(
                     handleGstPercentageChange(Number(e.target.value) || "")
                   }
                 />
+                <p className="text-xs text-blue-600 font-semibold">
+                  GST is inclusive of bank payment
+                </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gstAmount">GST Amount (₹)</Label>
+                <Label htmlFor="editGstAmount">GST Amount (₹)</Label>
                 <Input
-                  id="gstAmount"
+                  id="editGstAmount"
                   type="number"
                   placeholder="0.00"
                   value={gstAmount}
@@ -837,23 +895,26 @@ const mainParticulars = Object.values(AreaType).filter(
                     handleGstAmountChange(Number(e.target.value) || "")
                   }
                 />
+                <p className="text-xs text-blue-600 font-semibold">
+                  Calculated: ₹{Number(gstAmount || 0).toFixed(2)}
+                </p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="brand">Brand</Label>
+                <Label htmlFor="editBrand">Brand</Label>
                 <Input
-                  id="brand"
+                  id="editBrand"
                   placeholder="Enter brand name"
                   value={brand}
                   onChange={(e) => setBrand(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="model">Model</Label>
+                <Label htmlFor="editModel">Model</Label>
                 <Input
-                  id="model"
+                  id="editModel"
                   placeholder="Enter model name"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
@@ -862,9 +923,9 @@ const mainParticulars = Object.values(AreaType).filter(
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="remark">Remark</Label>
+              <Label htmlFor="editRemark">Remark</Label>
               <Input
-                id="remark"
+                id="editRemark"
                 placeholder="Add any additional notes"
                 value={remark}
                 onChange={(e) => setRemark(e.target.value)}
