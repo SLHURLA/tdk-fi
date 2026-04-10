@@ -126,7 +126,8 @@ const mainParticulars = Object.values(AreaType).filter(
 
         // GST calculated ONLY on bank payment
         if (editedField === "percentage") {
-          const gst = (bank * pct) / 100;
+          // const gst = (bank * pct) / 100;
+          const gst = bank * (pct / (100 + pct));
           setGstAmount(Number(gst.toFixed(2)));
         }
 
