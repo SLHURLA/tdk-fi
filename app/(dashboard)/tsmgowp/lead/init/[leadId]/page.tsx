@@ -146,7 +146,8 @@ const InitLead: React.FC = () => {
 
     // Only calculate GST amount if both custPrice and addGst are non-zero
     if (custPrice && addGst) {
-      const calculatedGstAmount = (custPrice * Number(addGst)) / 100;
+      // const calculatedGstAmount = (custPrice * Number(addGst)) / 100;
+      const calculatedGstAmount = (custPrice * Number(addGst)) / (100 + Number(addGst));
       setAddGstAmount(Number(calculatedGstAmount.toFixed(2)));
     }
   }, [addGst, custPrice]);
@@ -160,7 +161,8 @@ const InitLead: React.FC = () => {
 
     // Only calculate GST percentage if both custPrice and addGstAmount are non-zero
     if (custPrice && addGstAmount) {
-      const calculatedGstPercentage = (Number(addGstAmount) / custPrice) * 100;
+      // const calculatedGstPercentage = (Number(addGstAmount) / custPrice) * 100;
+      const calculatedGstPercentage = (Number(addGstAmount) / (custPrice - Number(addGstAmount))) * 100;
       setAddGst(Number(calculatedGstPercentage.toFixed(2)));
     }
   }, [addGstAmount, custPrice]);
