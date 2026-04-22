@@ -7,20 +7,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Briefcase } from "lucide-react";
-import { Button } from "../ui/button";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 
 interface LeadOverviewProps {
-  // leadId: string;
-  // leadId: number;
-  leadId: number; // backend use
-  displayLeadId: string; // UI display
+  leadId: number;
+  displayLeadId: string;
   customer: string;
   phone: string;
   contactInfo: string;
   store: string;
   status: "WON" | "LOSS" | "INPROGRESS";
-  createdAt: string;
+  createdAt: string; // Used as the base date
   updatedAt: string;
   expectedHandover: string;
 }
@@ -35,8 +33,71 @@ const LeadOverview: React.FC<LeadOverviewProps> = ({
   status,
   createdAt,
   updatedAt,
-  expectedHandover,
 }) => {
+  // Logic to calculate "Won At" (createdAt minus 1 day)
+  const getWonAtDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    // Subtract 1 day (24 hours)
+    date.setDate(date.getDate() - 1);
+
+    // Returns format: DD/MM/YYYY (adjust locale as needed)
+    return date.toLocaleDateString("en-GB");
+  };
+  const { toast } = useToast();
+
+  const [customerName, setCustomerName] = useState(customer);
+  const [isEditing, setIsEditing] = useState(false);
+
+  const wonAt = getWonAtDate(createdAt);
+  const handleUpdateCustomer = async () => {
+    if (!customerName.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Customer name cannot be empty",
+      });
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/updateCustomerName", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          leadId,
+          customerName,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast({
+          title: "Success",
+          description: "Customer name updated successfully ✅",
+        });
+
+        setIsEditing(false);
+
+        window.location.reload(); // or mutate()
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: data.message,
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Something went wrong",
+      });
+    }
+  };
+
   return (
     <Card className="lg:p-4 shadow-md rounded-lg w-full">
       <CardHeader>
@@ -46,14 +107,14 @@ const LeadOverview: React.FC<LeadOverviewProps> = ({
       </CardHeader>
       <CardContent>
         <div className="grid lg:grid-cols-2 grid-cols-1 gap-3 text-sm">
+          {/* Using a cleaner map structure */}
           {[
-            { label: "Customer ID", value: leadId },
-            { label: "Customer", value: customer },
+            { label: "Customer ID", value: displayLeadId },
+            // { label: "Customer", value: customer },
             { label: "Phone", value: phone },
             { label: "Contact Info", value: contactInfo },
             { label: "Store", value: store },
-            { label: "Created At", value: createdAt },
-            // { label: "Expected Handover", value: expectedHandover },
+            { label: "Won At", value: wonAt }, // Displays the calculated date
           ].map(({ label, value }) => (
             <div
               key={label}
@@ -63,6 +124,45 @@ const LeadOverview: React.FC<LeadOverviewProps> = ({
               <p className="text-right">{value}</p>
             </div>
           ))}
+          <div className="p-2 border rounded-md flex items-center justify-between">
+            <span className="font-semibold">Customer:</span>
+
+            <div className="flex gap-2 items-center">
+              {isEditing ? (
+                <>
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="border px-2 py-1 rounded"
+                  />
+
+                  <Button size="sm" onClick={handleUpdateCustomer}>
+                    Save
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setCustomerName(customer);
+                      setIsEditing(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-right">{customer}</p>
+
+                  <Button size="sm" onClick={() => setIsEditing(true)}>
+                    Edit
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
 
           {/* Status Field with Dynamic Styling */}
           <div className="p-2 border rounded-md flex items-center justify-between">

@@ -42,48 +42,14 @@ export type Lead = {
   payInOnline: number;
   receiveCash: number;
   receiveOnline: number;
+  // ✅ Added: required for correct profit calculation (matches SingleLead formula)
+  totalExp: number;   // vendor expenses
+  totalGST: number;   // GST amount
   createdAt: string;
   updatedAt: string;
   init: boolean;
 };
-// const handleDelete = async (id: number) => {
 
-//   const confirmDelete = confirm("Are you sure you want to delete this lead?");
-
-//   if (!confirmDelete) return;
-
-//   try {
-//     const res = await fetch("/api/deleteLead", {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//       },
-//       body: JSON.stringify({ leadId: id }),
-//     });
-
-//     const data = await res.json();
-
-//     if (res.ok) {
-//       toast({
-//         title: "Deleted",
-//         description: "Lead deleted successfully",
-//       });
-
-//       // 🔥 refresh table
-//       window.location.reload();
-//     } else {
-//       toast({
-//         title: "Error",
-//         description: data.message,
-//       });
-//     }
-//   } catch (error) {
-//     toast({
-//       title: "Error",
-//       description: "Something went wrong",
-//     });
-//   }
-// };
 const handleDelete = async (id: number) => {
   try {
     const res = await fetch("/api/deleteLead", {
@@ -101,7 +67,6 @@ const handleDelete = async (id: number) => {
         title: "Lead Deleted",
         description: "The lead has been permanently removed.",
       });
-
       window.location.reload();
     } else {
       toast({
@@ -118,7 +83,8 @@ const handleDelete = async (id: number) => {
     });
   }
 };
-const columns: ColumnDef<Lead>[] = [
+
+export const columns: ColumnDef<Lead>[] = [
   {
     accessorKey: "lead_id",
     header: ({ column }) => (
@@ -146,112 +112,98 @@ const columns: ColumnDef<Lead>[] = [
   },
   {
     accessorKey: "store",
-    header: () => (
-      <Button variant="ghost" className="justify-start w-full">
-        Store
-      </Button>
-    ),
+    header: "Store",
   },
   {
     accessorKey: "customerName",
-    header: () => (
-      <Button variant="ghost" className="justify-start w-full">
-        Customer Name
-      </Button>
-    ),
+    header: "Customer Name",
   },
   {
     accessorKey: "phoneNo",
-    header: () => (
-      <Button variant="ghost" className="justify-start w-full">
-        Phone No.
-      </Button>
-    ),
-  },
-  {
-    accessorKey: "contactInfo",
-    header: () => (
-      <Button variant="ghost" className="justify-start w-full">
-        Contact Info
-      </Button>
-    ),
+    header: "Phone No.",
   },
   {
     accessorKey: "status",
-    header: () => (
-      <Button variant="ghost" className="justify-start w-full">
-        Status
-      </Button>
-    ),
+    header: "Status",
     cell: ({ row }) => {
-      const lead = row.original;
-      let statusStyle = "";
-
-      if (lead.status === "WON")
-        statusStyle = "bg-green-600 text-white px-2 py-1 rounded-md";
-      else if (lead.status === "INPROGRESS")
-        statusStyle = "bg-yellow-600 text-white px-2 py-1 rounded-md";
-      else if (lead.status === "LOST")
-        statusStyle = "bg-red-600 text-white px-2 py-1 rounded-md";
-      else if (lead.status === "CLOSED")
-        statusStyle = "bg-blue-600 text-white px-2 py-1 rounded-md";
-
+      const status = row.getValue("status") as string;
+      const styles: Record<string, string> = {
+        WON: "bg-green-600",
+        INPROGRESS: "bg-yellow-600",
+        LOST: "bg-red-600",
+        CLOSED: "bg-blue-600",
+      };
       return (
-        <span className={`text-center text-xs block ${statusStyle}`}>
-          {lead.status === "WON" ? "NOT_INITIALIZED" : lead.status}
+        <span
+          className={`px-2 py-1 rounded-md text-white text-xs font-medium ${
+            styles[status] || "bg-gray-500"
+          }`}
+        >
+          {status === "WON" ? "NOT_INITIALIZED" : status}
         </span>
       );
     },
   },
   {
-    id: "paymentPercentage",
-
+    id: "financials",
     header: () => (
       <Button variant="ghost" className="justify-start w-full">
-        Payment %{/* <ArrowUpDown className="ml-2 h-4 w-4" /> */}
+        Financials / Progress
       </Button>
     ),
     cell: ({ row }) => {
       const lead = row.original;
+
       const totalReceived = (lead.receiveCash || 0) + (lead.receiveOnline || 0);
+
+      // ✅ Correct profit formula — identical to SingleLead:
+      // profit = receiveCash + receiveOnline - totalExp - totalGST
+      if (lead.status === "CLOSED") {
+        const netProfit =
+          totalReceived - (lead.totalExp || 0) - (lead.totalGST || 0);
+
+        const profitMargin =
+          totalReceived > 0
+            ? Math.round((netProfit / totalReceived) * 100)
+            : 0;
+
+        return (
+          <div className="flex flex-col gap-1">
+            <span
+              className={`text-xs font-bold ${
+                netProfit >= 0 ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              Profit: ₹{netProfit.toLocaleString("en-IN")}
+            </span>
+            <span className="text-[10px] text-muted-foreground font-medium uppercase">
+              {profitMargin}% Margin
+            </span>
+          </div>
+        );
+      }
+
+      // Non-closed leads: payment progress bar (unchanged)
       const percentage =
         lead.totalProjectCost > 0
           ? Math.round((totalReceived / lead.totalProjectCost) * 100)
           : 0;
 
-      let progressBarColor = "";
-      let badgeColor = "";
-
-      if (percentage >= 100) {
-        progressBarColor = "bg-green-600";
-        badgeColor = "bg-green-600 text-white";
-      } else if (percentage >= 75) {
-        progressBarColor = "bg-emerald-600";
-        badgeColor = "bg-emerald-600 text-white";
-      } else if (percentage >= 50) {
-        progressBarColor = "bg-yellow-600";
-        badgeColor = "bg-yellow-600 text-white";
-      } else if (percentage >= 25) {
-        progressBarColor = "bg-orange-600";
-        badgeColor = "bg-orange-600 text-white";
-      } else {
-        progressBarColor = "bg-red-600";
-        badgeColor = "bg-red-600 text-white";
-      }
+      const getProgressColor = (pct: number) => {
+        if (pct >= 100) return "bg-green-600";
+        if (pct >= 50) return "bg-yellow-600";
+        return "bg-red-600";
+      };
 
       return (
-        <div className="flex items-center w-full">
-          <div className="w-20 bg-gray-300 rounded-full h-2.5 mr-2">
+        <div className="flex items-center space-x-2">
+          <div className="w-16 bg-gray-200 rounded-full h-2">
             <div
-              className={`h-2.5 rounded-full ${progressBarColor}`}
+              className={`h-2 rounded-full ${getProgressColor(percentage)}`}
               style={{ width: `${Math.min(percentage, 100)}%` }}
-            ></div>
+            />
           </div>
-          <span
-            className={`px-2 py-1 rounded-md text-xs font-medium ${badgeColor}`}
-          >
-            {percentage}%
-          </span>
+          <span className="text-xs font-semibold">{percentage}%</span>
         </div>
       );
     },
@@ -264,7 +216,6 @@ const columns: ColumnDef<Lead>[] = [
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -281,12 +232,11 @@ const columns: ColumnDef<Lead>[] = [
                 <AlertDialogTrigger asChild>
                   <DropdownMenuItem
                     className="text-red-600"
-                    onSelect={(e) => e.preventDefault()} // 🔥 IMPORTANT
+                    onSelect={(e) => e.preventDefault()}
                   >
                     Delete Lead
                   </DropdownMenuItem>
                 </AlertDialogTrigger>
-
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>
@@ -294,14 +244,11 @@ const columns: ColumnDef<Lead>[] = [
                     </AlertDialogTitle>
                     <AlertDialogDescription>
                       This action cannot be undone. This will permanently delete
-                      this lead and all its related data (transactions, items,
-                      vendors).
+                      this lead and all related data.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
-
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-
                     <AlertDialogAction
                       className="bg-red-600 hover:bg-red-700"
                       onClick={() => handleDelete(lead.id)}
@@ -312,35 +259,14 @@ const columns: ColumnDef<Lead>[] = [
                 </AlertDialogContent>
               </AlertDialog>
             )}
-            {/* {!lead.init && (
-              <DropdownMenuItem
-                className="text-red-600"
-                onClick={() => handleDelete(lead.id)}
-              >
-                Delete Lead
-              </DropdownMenuItem>
-            )} */}
-
-            {/* <DropdownMenuItem>View Lead</DropdownMenuItem> */}
           </DropdownMenuContent>
         </DropdownMenu>
       );
     },
   },
 ];
-// this is for the colums section
-// Function to dynamically filter columns based on pathname
-export const getColumns = () => {
-  const pathname = usePathname(); // Get current route in Next.js
 
-  return columns.filter((column) => {
-    // Remove payment column if the path is "/tsmgowp/leads/all"
-    if (
-      column.id === "paymentPercentage" &&
-      pathname === "/tsmgowp/leads/all"
-    ) {
-      return false;
-    }
-    return true;
-  });
+export const getColumns = () => {
+  const pathname = usePathname();
+  return columns;
 };
