@@ -7,7 +7,6 @@ import {
   Calendar,
   ChevronDown,
   CircleDollarSign,
-  Clock,
   DollarSign,
   Home,
   LayoutDashboard,
@@ -67,7 +66,11 @@ interface RevenueData {
   projectClose: number;
   totalProjects?: number;
   totalVendorPayments?: number;
+  totalVendorExp?: number;
   totalExpenses?: number;
+  totalGST?: number;
+  grossProfit?: number;
+  netProfit?: number;
   cash?: number;
   online?: number;
   receiveCash?: number;
@@ -108,7 +111,11 @@ interface FinYearData {
   projectClose: number;
   totalProjects?: number;
   totalVendorPayments?: number;
+  totalVendorExp?: number;
   totalExpenses?: number;
+  totalGST?: number;
+  grossProfit?: number;
+  netProfit?: number;
   cash?: number;
   online?: number;
   receiveCash?: number;
@@ -155,12 +162,23 @@ const fetcher = async (url: string): Promise<any> => {
   return data;
 };
 
+const getCurrentFinYear = (): string => {
+  const now = new Date();
+  const m = now.getMonth() + 1;
+  const y = now.getFullYear();
+  return m >= 4 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+};
+
 export default function Dashboard() {
-  const [timeframe, setTimeframe] = useState<string>("yearly");
-  const [selectedYear, setSelectedYear] = useState<string>("2025");
+  const [timeframe, setTimeframe] = useState<string>("financial");
+  const [selectedYear, setSelectedYear] = useState<string>(
+    String(new Date().getFullYear())
+  );
   const [selectedMonth, setSelectedMonth] = useState<string>("January");
   const [selectedQuarter, setSelectedQuarter] = useState<string>("1");
-  const [selectedFinYear, setSelectedFinYear] = useState<string>("2024-2025");
+  const [selectedFinYear, setSelectedFinYear] = useState<string>("");
+  // Auto-correct selectedFinYear if it doesn't exist in data
+  const [finYearInitialized, setFinYearInitialized] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("handover");
   const { data: session } = useSession();
 
@@ -184,6 +202,7 @@ export default function Dashboard() {
     isLoading: ongoingLoading,
     error: ongoingError,
   } = useSWR(ongoingUrl, fetcher);
+  const { data: gstData } = useSWR("/api/getGSTSummary", fetcher);
 
   console.log("data", handoverData, ongoingData);
 
@@ -194,7 +213,8 @@ export default function Dashboard() {
 
   const transformData = (
     data: any,
-    isStoreManager: boolean = false
+    isStoreManager: boolean = false,
+    gst: any = null
   ): {
     revenueData: RevenueData[];
     userStoreWiseRevenue: Record<string, StoreData>;
@@ -211,40 +231,99 @@ export default function Dashboard() {
     }
 
     /**
-     * Helper to enforce your new formulas:
-     * 1. Gross Profit = Revenue - Vendor Payments
-     * 2. Total Profit = Gross Profit - Store Expenses
+     * Formulas (from handoverProject route):
+     *   DB Revenue.totalProfit = receiveCash + receiveOnline − totalExp − totalGST
+     *
+     *   Gross Profit = Revenue − totalVendorExp − totalGST
+     *   Net Profit   = Gross Profit − totalExpenses (store exp notes)
+     *
+     * API provides these fields from getAllRevenue (new route):
+     *   totalRevenue    = sum of lead revenue   (NOTE: aggregate rows use `totalRevenue`, not `revenue`)
+     *   totalVendorExp  = sum of lead.totalExp   (budgeted vendor cost)
+     *   totalGST        = sum of lead.totalGST
+     *   totalExpenses   = sum of storeExpNotes
      */
-    const calculateMetrics = (item: any) => {
-      const revenue = Number(item.revenue) || 0;
-      const vendorPayments = Number(item.totalVendorPayments) || 0;
-      const storeExpenses = Number(item.totalExpenses) || 0;
+    // Build EXACT finYear → GST lookup (no fallthrough to month/year)
+    const gstByFinYear: Record<string, number> = {};
+    const gstByMonth: Record<string, number> = {};
+    const gstByYear: Record<string, number> = {};
+    if (gst) {
+      gst.finYearWise?.forEach((d: any) => {
+        if (d.finYear) gstByFinYear[d.finYear] = Number(d.totalGST) || 0;
+      });
+      gst.monthWise?.forEach((d: any) => {
+        if (d.month) gstByMonth[d.month] = Number(d.totalGST) || 0;
+      });
+      gst.yearWise?.forEach((d: any) => {
+        if (d.year) gstByYear[String(d.year)] = Number(d.totalGST) || 0;
+      });
+    }
 
-      const grossProfit = revenue - vendorPayments;
-      const netTotalProfit = grossProfit - storeExpenses;
+    // Inject totalGST into an item using EXACT key match only — no fallthrough
+    const injectGST = (item: any): any => {
+      // item.totalGST already set (new API) — no injection needed
+      if (Number(item.totalGST) > 0) return item;
+
+      let gstAmt = 0;
+      if (item.finYear && gstByFinYear[item.finYear] !== undefined) {
+        gstAmt = gstByFinYear[item.finYear];
+      } else if (!item.finYear && (item.month || item.monthYear)) {
+        const mk = item.month || item.monthYear;
+        if (gstByMonth[mk] !== undefined) gstAmt = gstByMonth[mk];
+      } else if (!item.finYear && item.year) {
+        const yk = String(item.year);
+        if (gstByYear[yk] !== undefined) gstAmt = gstByYear[yk];
+      }
+
+      return gstAmt > 0 ? { ...item, totalGST: gstAmt } : item;
+    };
+
+    const calculateMetrics = (item: any) => {
+      const enriched = injectGST(item);
+      // FIX: aggregate rows (finYear / year) use `totalRevenue`, month rows use `revenue`.
+      // Read whichever exists so finYear cards don't read 0 and blow up Gross Profit.
+      const revenue = Number(enriched.revenue ?? enriched.totalRevenue) || 0;
+      // totalVendorExp (lead.totalExp) from new API; fall back to totalVendorPayments from old API
+      const vendorExp =
+        Number(enriched.totalVendorExp ?? enriched.totalVendorPayments) || 0;
+      const gstAmt = Number(enriched.totalGST) || 0;
+      const storeExpenses = Number(enriched.totalExpenses) || 0;
+      const vendorPayments = Number(enriched.totalVendorPayments) || 0;
+      const receiveCash = Number(enriched.receiveCash) || 0;
+      const receiveOnline = Number(enriched.receiveOnline) || 0;
+
+      const grossProfit = revenue - vendorExp - gstAmt;
+      const netProfit = grossProfit - storeExpenses;
 
       return {
-        ...item,
-        revenue,
-        totalVendorPayments: vendorPayments,
+        ...enriched,
+        revenue, // normalized
+        totalRevenue: revenue, // keep both keys in sync
+        totalVendorExp: vendorExp,
+        totalGST: gstAmt,
         totalExpenses: storeExpenses,
-        grossProfit: grossProfit, // New field for your UI
-        totalProfit: netTotalProfit, // Overwriting API totalProfit with your custom logic
+        totalVendorPayments: vendorPayments,
+        receiveCash,
+        receiveOnline,
+        grossProfit,
+        netProfit,
+        totalProfit: netProfit,
       };
     };
 
     // 1. Logic for STORE_MANAGER
     if (isStoreManager) {
       const storeRevenueData =
-        data.monthWiseRevenue?.map((item: any) => 
+        data.monthWiseRevenue?.map((item: any) =>
           calculateMetrics({
             ...item,
             month: item.monthYear || item.month,
           })
         ) || [];
 
-      const storeFinYearData = 
-        data.finYearWiseRevenue?.map((item: any) => calculateMetrics(item)) || [];
+      const storeFinYearData =
+        data.finYearWiseRevenue?.map((item: any) => calculateMetrics(item)) ||
+        [];
 
       return {
         revenueData: storeRevenueData,
@@ -265,9 +344,11 @@ export default function Dashboard() {
           acc[key] = calculateMetrics({
             userId: item.userId,
             store: item.store,
-            revenue: item.revenue,
+            revenue: item.revenue ?? item.totalRevenue,
+            totalVendorExp: item.totalVendorExp,
             totalVendorPayments: item.totalVendorPayments,
             totalExpenses: item.totalExpenses,
+            totalGST: item.totalGST,
             projectClose: item.projectClose,
           });
           return acc;
@@ -276,16 +357,20 @@ export default function Dashboard() {
       ) || {};
 
     // Transforming the comparison storeData array
-    const transformedStoreData = data.storeData?.map((store: any) => ({
-      ...store,
-      yearly: store.yearly?.map((y: any) => calculateMetrics(y)),
-      monthly: store.monthly?.map((m: any) => calculateMetrics(m)),
-      quarterly: store.quarterly?.map((q: any) => calculateMetrics(q)),
-      financialYear: store.financialYear?.map((fy: any) => calculateMetrics(fy)),
-    })) || [];
+    const transformedStoreData =
+      data.storeData?.map((store: any) => ({
+        ...store,
+        yearly: store.yearly?.map((y: any) => calculateMetrics(y)),
+        monthly: store.monthly?.map((m: any) => calculateMetrics(m)),
+        quarterly: store.quarterly?.map((q: any) => calculateMetrics(q)),
+        financialYear: store.financialYear?.map((fy: any) =>
+          calculateMetrics(fy)
+        ),
+      })) || [];
 
     return {
-      revenueData: data.monthWiseRevenue?.map((item: any) => calculateMetrics(item)) || [],
+      revenueData:
+        data.monthWiseRevenue?.map((item: any) => calculateMetrics(item)) || [],
       userStoreWiseRevenue,
       finYearData,
       storeData: transformedStoreData,
@@ -294,7 +379,7 @@ export default function Dashboard() {
 
   const isStoreManager = session?.user.role === "STORE_MANAGER";
   const { revenueData, finYearData, userStoreWiseRevenue, storeData } = data
-    ? transformData(data, isStoreManager)
+    ? transformData(data, isStoreManager, gstData)
     : {
         revenueData: [],
         finYearData: [],
@@ -345,19 +430,27 @@ export default function Dashboard() {
           const quarter = Math.floor(monthNum / 3) + 1;
           return quarter === parseInt(selectedQuarter) && year === selectedYear;
         });
-      case "financial":
-        return revenueData.filter((item) => {
-          const monthYear = item.month || item.monthYear;
-          const month = monthYear?.split("-")[0];
-          const year = monthYear?.split("-")[1];
-          if (!month || !year) return false;
-
-          const [startYear, endYear] = selectedFinYear.split("-");
-          const monthNum = new Date(`${month} 1, ${year}`).getMonth();
-          if (monthNum < 3 && year === endYear) return true;
-          if (monthNum >= 3 && year === startYear) return true;
+      case "financial": {
+        if (!selectedFinYear) return [];
+        // Try pre-aggregated finYear entry first
+        const fyEntry = finYearData.find((i) => i.finYear === selectedFinYear);
+        if (fyEntry) return [fyEntry];
+        // Fallback: filter month-by-month rows that belong to this finYear
+        const [startYear, endYear] = selectedFinYear.split("-");
+        const fallback = revenueData.filter((item) => {
+          const my = item.month || item.monthYear || "";
+          const parts = my.split("-");
+          if (parts.length < 2) return false;
+          const monthName = parts[0];
+          const yr = parts[parts.length - 1];
+          const mNum = new Date(`${monthName} 1, ${yr}`).getMonth() + 1;
+          if (isNaN(mNum)) return false;
+          if (mNum >= 4 && yr === startYear) return true;
+          if (mNum < 4 && yr === endYear) return true;
           return false;
         });
+        return fallback;
+      }
       default:
         return revenueData;
     }
@@ -519,6 +612,21 @@ export default function Dashboard() {
   };
 
   const previousData = getPreviousData();
+
+  // Once data loads, pick the best matching finYear:
+  // prefer current FY if it exists in data, else pick the latest available
+  useEffect(() => {
+    if (!finYearInitialized && finYearData.length > 0) {
+      const sorted = [...finYearData].sort((a, b) =>
+        b.finYear.localeCompare(a.finYear)
+      );
+      const current = getCurrentFinYear();
+      const exists = finYearData.some((d) => d.finYear === current);
+      // Use current FY if it has data, otherwise use latest FY that has data
+      setSelectedFinYear(exists ? current : sorted[0].finYear);
+      setFinYearInitialized(true);
+    }
+  }, [finYearData, finYearInitialized]);
 
   useEffect(() => {
     initTooltips();
@@ -690,119 +798,39 @@ export default function Dashboard() {
                 </p>
               </div>
 
-              {/* Top metrics - modified for tab-specific display */}
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                {/* Total Revenue - shown in both tabs */}
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Total Revenue
-                    </CardTitle>
-                    <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      ₹
-                      {formatNumber(
-                        isStoreManager
-                          ? data.totalRevenue
-                          : filteredData.reduce((acc, item) => acc + item.revenue, 0)
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                      <TrendingUp className="h-3 w-3 text-green-500" />
-                      <span className="text-green-500">
-                        {calculateGrowth(
-                          isStoreManager
-                            ? data.totalRevenue
-                            : filteredData.reduce((acc, item) => acc + item.revenue, 0),
-                          previousData.revenue
-                        )}
-                      </span>{" "}
-                      from previous{" "}
-                      {timeframe === "yearly"
-                        ? "year"
-                        : timeframe === "monthly"
-                        ? "month"
-                        : timeframe === "quarterly"
-                        ? "quarter"
-                        : "financial year"}
-                    </p>
-                  </CardContent>
-                </Card>
-                {/* total expenses */}
-                {activeTab === "handover" && (
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Total Expenses
-                      </CardTitle>
-                      <Package className="h-4 w-4 text-muted-foreground" />
+              {/* ── Metric cards ──────────────────────────────────────────── */}
+
+              {activeTab === "handover" && (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {/* Total Revenue */}
+                  <Card className="border-l-4 border-l-blue-500">
+                    <CardHeader className="pb-1">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Total Revenue
+                        </CardTitle>
+                        <ReceiptIndianRupee className="h-4 w-4 text-blue-500" />
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
+                    <CardContent className="pt-1">
+                      <p className="text-3xl font-bold">
                         ₹
                         {formatNumber(
                           filteredData.reduce(
-                            (acc, item) =>
-                              acc +
-                              (item.totalVendorPayments || 0) +
-                              (item.totalExpenses || 0),
+                            (acc, item) => acc + (item.revenue || 0),
                             0
                           )
                         )}
-                      </div>
-
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Your total expenses
                       </p>
-                    </CardContent>
-                  </Card>
-                )}
-                {activeTab === "handover" && (
-                  <Card className="shadow-sm border-t-4 ">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Gross Profit
-                      </CardTitle>
-                      <TrendingUp className="h-4 w-4" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold ">
-                        ₹{formatNumber(filteredData.reduce((acc, item) => acc + (item.grossProfit || 0), 0))}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">Margin after material</p>
-                    </CardContent>
-                  </Card>
-                )}
-                {/* Total Profit - shown in both tabs */}
-                {activeTab === "handover" && (
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Total Profit
-                      </CardTitle>
-                      <span className="text-muted-foreground items-center justify-center">
-                        ₹
-                      </span>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        ₹
-                        {formatNumber(
-                          isStoreManager
-                            ? data.totalProfit
-                            : filteredData.reduce((acc, item) => acc + item.totalProfit, 0)
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                      <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                         <TrendingUp className="h-3 w-3 text-green-500" />
                         <span className="text-green-500">
                           {calculateGrowth(
-                            isStoreManager
-                              ? data.totalProfit
-                              : filteredData.reduce((acc, item) => acc + item.totalProfit, 0),
-                            previousData.totalProfit
+                            filteredData.reduce(
+                              (acc, item) => acc + (item.revenue || 0),
+                              0
+                            ),
+                            previousData.revenue
                           )}
                         </span>{" "}
                         from previous{" "}
@@ -816,85 +844,122 @@ export default function Dashboard() {
                       </p>
                     </CardContent>
                   </Card>
-                )}
-                {/* Projects Closed/Live - shown in both tabs with conditional title */}
-                {activeTab === "handover" && (
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Projects Closed
-                      </CardTitle>
-                      <Package className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {filteredData.reduce(
-                          (acc, item) => acc + (item.projectClose || 0),
-                          0
-                        )}
+
+                  {/* Vendor Exp (lead.totalExp) */}
+                  <Card className="border-l-4 border-l-orange-400">
+                    <CardHeader className="pb-1">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Vendor Exp
+                        </CardTitle>
+                        <Package className="h-4 w-4 " />
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Successfully completed projects
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-                {activeTab === "ongoing" && (
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Ongoing Projects
-                      </CardTitle>
-                      <Package className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {filteredData.reduce(
-                          (acc, item) => acc + (item.totalProjects || 0),
-                          0
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Currently active projects
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-                {activeTab === "handover" && (
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Vendor Payments
-                      </CardTitle>
-                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
+                    <CardContent className="pt-1">
+                      <p className="text-3xl font-bold text-purple-600">
                         ₹
                         {formatNumber(
                           filteredData.reduce(
                             (acc, item) =>
-                              acc + (item.totalVendorPayments || 0),
+                              acc +
+                              (item.totalVendorExp ||
+                                item.totalVendorPayments ||
+                                0),
                             0
                           )
                         )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Total payments to vendors
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Budgeted vendor cost per lead
                       </p>
                     </CardContent>
                   </Card>
-                )}
-                {activeTab === "handover" && (
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Total Store Expenses
-                      </CardTitle>
-                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
+
+                  {/* GST */}
+                  <Card className="border-l-4 border-l-yellow-500">
+                    <CardHeader className="pb-1">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Total GST
+                        </CardTitle>
+                        <ReceiptIndianRupee className="h-4 w-4 text-yellow-500" />
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
+                    <CardContent className="pt-1">
+                      <p className="text-3xl font-bold ">
+                        ₹
+                        {formatNumber(
+                          filteredData.reduce(
+                            (acc, item) => acc + (item.totalGST || 0),
+                            0
+                          )
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Goods &amp; Services Tax from leads
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {/* Gross Profit */}
+                  <Card className="border-l-4 border-l-sky-500">
+                    <CardHeader className="pb-1">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Gross Profit
+                        </CardTitle>
+                        <TrendingUp className="h-4 w-4 text-sky-500" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-1">
+                      <p
+                        className={`text-3xl font-bold ${
+                          filteredData.reduce(
+                            (acc, item) =>
+                              acc +
+                              (item.revenue || 0) -
+                              (item.totalVendorExp ||
+                                item.totalVendorPayments ||
+                                0) -
+                              (item.totalGST || 0),
+                            0
+                          ) < 0
+                            ? "text-red-600"
+                            : "text-sky-600"
+                        }`}
+                      >
+                        ₹
+                        {formatNumber(
+                          filteredData.reduce(
+                            (acc, item) =>
+                              acc +
+                              (item.revenue || 0) -
+                              (item.totalVendorExp ||
+                                item.totalVendorPayments ||
+                                0) -
+                              (item.totalGST || 0),
+                            0
+                          )
+                        )}
+                      </p>
+                      <span className="text-xs font-mono bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 rounded px-2 py-0.5 mt-2 inline-block">
+                        Revenue − Vendor Exp − GST
+                      </span>
+                    </CardContent>
+                  </Card>
+
+                  {/* Store Expenses */}
+                  <Card className="border-l-4 border-l-red-400">
+                    <CardHeader className="pb-1">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Store Expenses
+                        </CardTitle>
+                        <ReceiptIndianRupee className="h-4 w-4 text-red-400" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-1">
+                      <p className="text-3xl font-bold ">
                         ₹
                         {formatNumber(
                           filteredData.reduce(
@@ -902,27 +967,172 @@ export default function Dashboard() {
                             0
                           )
                         )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Total Store Expenses
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Operational overhead (store exp notes)
                       </p>
                     </CardContent>
                   </Card>
-                )}
-              </div>
 
-              {/* Payment methods - only shown in ongoing tab */}
-              {activeTab === "ongoing" && (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-6">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Receive in Cash
-                      </CardTitle>
-                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
+                  {/* Net Profit */}
+                  <Card className="border-l-4 border-l-green-500">
+                    <CardHeader className="pb-1">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Net Profit
+                        </CardTitle>
+                        <CircleDollarSign className="h-4 w-4 text-green-500" />
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
+                    <CardContent className="pt-1">
+                      <p
+                        className={`text-3xl font-bold ${
+                          filteredData.reduce(
+                            (acc, item) =>
+                              acc +
+                              (item.revenue || 0) -
+                              (item.totalVendorExp ||
+                                item.totalVendorPayments ||
+                                0) -
+                              (item.totalGST || 0) -
+                              (item.totalExpenses || 0),
+                            0
+                          ) < 0
+                            ? "text-red-600"
+                            : "text-green-600"
+                        }`}
+                      >
+                        ₹
+                        {formatNumber(
+                          filteredData.reduce(
+                            (acc, item) =>
+                              acc +
+                              (item.revenue || 0) -
+                              (item.totalVendorExp ||
+                                item.totalVendorPayments ||
+                                0) -
+                              (item.totalGST || 0) -
+                              (item.totalExpenses || 0),
+                            0
+                          )
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                        <TrendingUp className="h-3 w-3 text-green-500" />
+                        <span className="text-green-500">
+                          {calculateGrowth(
+                            filteredData.reduce(
+                              (acc, item) =>
+                                acc +
+                                (item.revenue || 0) -
+                                (item.totalVendorExp ||
+                                  item.totalVendorPayments ||
+                                  0) -
+                                (item.totalGST || 0) -
+                                (item.totalExpenses || 0),
+                              0
+                            ),
+                            previousData.totalProfit
+                          )}
+                        </span>{" "}
+                        from previous{" "}
+                        {timeframe === "yearly"
+                          ? "year"
+                          : timeframe === "monthly"
+                          ? "month"
+                          : timeframe === "quarterly"
+                          ? "quarter"
+                          : "financial year"}
+                      </p>
+                      <span className="text-xs font-mono bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded px-2 py-0.5 mt-1 inline-block">
+                        Gross Profit − Store Expenses
+                      </span>
+                    </CardContent>
+                  </Card>
+
+                  {/* Projects Closed */}
+                  <Card className="border-l-4 border-l-purple-500 sm:col-span-2 xl:col-span-1">
+                    <CardHeader className="pb-1">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Projects Closed
+                        </CardTitle>
+                        <Package className="h-4 w-4 text-purple-500" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-1">
+                      <p className="text-3xl font-bold text-purple-600">
+                        {filteredData.reduce(
+                          (acc, item) => acc + (item.projectClose || 0),
+                          0
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Successfully handed over this period
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {activeTab === "ongoing" && (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <Card className="border-l-4 border-l-blue-500">
+                    <CardHeader className="pb-1">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Total Revenue
+                        </CardTitle>
+                        <ReceiptIndianRupee className="h-4 w-4 text-blue-500" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-1">
+                      <p className="text-3xl font-bold">
+                        ₹
+                        {formatNumber(
+                          filteredData.reduce(
+                            (acc, item) => acc + (item.revenue || 0),
+                            0
+                          )
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Total project value billed
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-l-4 border-l-purple-500">
+                    <CardHeader className="pb-1">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Ongoing Projects
+                        </CardTitle>
+                        <Package className="h-4 w-4 text-purple-500" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-1">
+                      <p className="text-3xl font-bold text-purple-600">
+                        {filteredData.reduce(
+                          (acc, item) => acc + (item.totalProjects || 0),
+                          0
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Currently active projects
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-l-4 border-l-teal-500">
+                    <CardHeader className="pb-1">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Receive in Cash
+                        </CardTitle>
+                        <ReceiptIndianRupee className="h-4 w-4 text-teal-500" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-1">
+                      <p className="text-3xl font-bold text-teal-600">
                         ₹
                         {formatNumber(
                           filteredData.reduce(
@@ -930,21 +1140,23 @@ export default function Dashboard() {
                             0
                           )
                         )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">
                         Total cash receipts
                       </p>
                     </CardContent>
                   </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Receive Online
-                      </CardTitle>
-                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
+                  <Card className="border-l-4 border-l-indigo-500">
+                    <CardHeader className="pb-1">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Receive Online
+                        </CardTitle>
+                        <ReceiptIndianRupee className="h-4 w-4 text-indigo-500" />
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
+                    <CardContent className="pt-1">
+                      <p className="text-3xl font-bold text-indigo-600">
                         ₹
                         {formatNumber(
                           filteredData.reduce(
@@ -952,21 +1164,23 @@ export default function Dashboard() {
                             0
                           )
                         )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">
                         Total online receipts
                       </p>
                     </CardContent>
                   </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Receive Total
-                      </CardTitle>
-                      <ReceiptIndianRupee className="h-4 w-4 text-muted-foreground" />
+                  <Card className="border-l-4 border-l-cyan-500 sm:col-span-2 xl:col-span-1">
+                    <CardHeader className="pb-1">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Receive Total
+                        </CardTitle>
+                        <ReceiptIndianRupee className="h-4 w-4 text-cyan-500" />
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
+                    <CardContent className="pt-1">
+                      <p className="text-3xl font-bold text-cyan-600">
                         ₹
                         {formatNumber(
                           filteredData.reduce(
@@ -977,92 +1191,198 @@ export default function Dashboard() {
                             0
                           )
                         )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">
                         Total receipts Online + Cash
                       </p>
                     </CardContent>
                   </Card>
                 </div>
               )}
-              {/* Financial Year Overview Card */}
+
+              {/* Financial Year P&L Summary Card */}
               {timeframe === "financial" && selectedFinYear && (
-                <Card className="mt-4">
-                  <CardHeader>
-                    <CardTitle>
-                      Financial Year {selectedFinYear} Overview
-                    </CardTitle>
-                    <CardDescription>
-                      Comprehensive financial data for FY {selectedFinYear}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex justify-between">
-                        <span>Total Profit:</span>
-                        <span
-                          className={`font-semibold ${
-                            (isStoreManager
-                              ? data.totalProfit
-                              : selectedFinYearData?.totalProfit || 0) < 0
-                              ? "text-red-500"
-                              : "text-green-500"
+                <Card className="mt-4 overflow-hidden">
+                  <div className="bg-slate-800 dark:bg-slate-900 px-6 py-4">
+                    <h3 className="text-white font-semibold text-lg">
+                      FY {selectedFinYear} — Profit &amp; Loss Summary
+                    </h3>
+                    <p className="text-slate-400 text-sm mt-0.5">
+                      Handover projects ·{" "}
+                      {selectedFinYearData?.projectClose || 0} closed
+                    </p>
+                  </div>
+                  <CardContent className="p-0">
+                    <div className="divide-y divide-border">
+                      <div className="flex items-center justify-between px-6 py-4 bg-blue-50/50 dark:bg-blue-950/20">
+                        <div>
+                          <p className="font-medium text-sm">Total Revenue</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Project value billed to customers
+                          </p>
+                        </div>
+                        <p className="text-xl font-bold text-blue-600">
+                          ₹{formatNumber(selectedFinYearData?.revenue || 0)}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between px-6 py-4">
+                        <div>
+                          <p className="font-medium text-sm ">
+                            − Vendor Exp
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Budgeted vendor cost (lead.totalExp)
+                          </p>
+                        </div>
+                        <p className="text-xl font-bold ">
+                          ₹
+                          {formatNumber(
+                            selectedFinYearData?.totalVendorExp ||
+                              selectedFinYearData?.totalVendorPayments ||
+                              0
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between px-6 py-4">
+                        <div>
+                          <p className="font-medium text-sm text-yellow-700 dark:text-yellow-400">
+                            − GST
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Goods &amp; Services Tax (lead.totalGST)
+                          </p>
+                        </div>
+                        <p className="text-xl font-bold text-yellow-600">
+                          ₹{formatNumber(selectedFinYearData?.totalGST || 0)}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between px-6 py-4 bg-sky-50/60 dark:bg-sky-950/20">
+                        <div>
+                          <p className="font-semibold text-sm text-sky-700 dark:text-sky-300">
+                            Gross Profit
+                          </p>
+                          <span className="text-xs font-mono bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 rounded px-2 py-0.5 mt-1 inline-block">
+                            Revenue − Vendor Exp − GST
+                          </span>
+                        </div>
+                        <p
+                          className={`text-2xl font-bold ${
+                            (selectedFinYearData?.revenue || 0) -
+                              (selectedFinYearData?.totalVendorExp ||
+                                selectedFinYearData?.totalVendorPayments ||
+                                0) -
+                              (selectedFinYearData?.totalGST || 0) <
+                            0
+                              ? "text-red-600"
+                              : "text-sky-600"
                           }`}
                         >
                           ₹
                           {formatNumber(
-                            isStoreManager
-                              ? data.totalProfit
-                              : selectedFinYearData?.totalProfit || 0
+                            (selectedFinYearData?.revenue || 0) -
+                              (selectedFinYearData?.totalVendorExp ||
+                                selectedFinYearData?.totalVendorPayments ||
+                                0) -
+                              (selectedFinYearData?.totalGST || 0)
                           )}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Total Revenue:</span>
-                        <span className="font-semibold">
-                          ₹
-                          {formatNumber(
-                            isStoreManager
-                              ? data.totalRevenue
-                              : selectedFinYearData?.revenue || 0
-                          )}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Projects Closed:</span>
-                        <span className="font-semibold">
-                          {isStoreManager
-                            ? data.totalProjectClose
-                            : selectedFinYearData?.projectClose || 0}
-                        </span>
+                        </p>
                       </div>
 
-                      <div className="flex justify-between">
-                        <span>Projects Live:</span>
-                        <span className="font-semibold">
-                          {isStoreManager
-                            ? data.totalProjects
-                            : selectedFinYearData?.totalProjects || 0}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between">
-                        <span>Vendor Payments:</span>
-                        <span className="font-semibold">
-                          ₹
-                          {formatNumber(
-                            selectedFinYearData?.totalVendorPayments || 0
-                          )}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Expenses:</span>
-                        <span className="font-semibold">
+                      <div className="flex items-center justify-between px-6 py-4">
+                        <div>
+                          <p className="font-medium text-sm text-red-700 dark:text-red-400">
+                            − Store Expenses
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Operational overhead
+                          </p>
+                        </div>
+                        <p className="text-xl font-bold text-red-600">
                           ₹
                           {formatNumber(
                             selectedFinYearData?.totalExpenses || 0
                           )}
-                        </span>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between px-6 py-5 bg-green-50/60 dark:bg-green-950/20">
+                        <div>
+                          <p className="font-bold text-base text-green-800 dark:text-green-300">
+                            Net Profit
+                          </p>
+                          <span className="text-xs font-mono bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 rounded px-2 py-0.5 mt-1 inline-block">
+                            Gross Profit − Store Expenses
+                          </span>
+                        </div>
+                        <p
+                          className={`text-3xl font-extrabold ${
+                            (selectedFinYearData?.revenue || 0) -
+                              (selectedFinYearData?.totalVendorExp ||
+                                selectedFinYearData?.totalVendorPayments ||
+                                0) -
+                              (selectedFinYearData?.totalGST || 0) -
+                              (selectedFinYearData?.totalExpenses || 0) <
+                            0
+                              ? "text-red-600"
+                              : "text-green-600"
+                          }`}
+                        >
+                          ₹
+                          {formatNumber(
+                            (selectedFinYearData?.revenue || 0) -
+                              (selectedFinYearData?.totalVendorExp ||
+                                selectedFinYearData?.totalVendorPayments ||
+                                0) -
+                              (selectedFinYearData?.totalGST || 0) -
+                              (selectedFinYearData?.totalExpenses || 0)
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-3 divide-x divide-border bg-muted/30">
+                        <div className="px-6 py-4 text-center">
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                            Projects Closed
+                          </p>
+                          <p className="text-2xl font-bold mt-1 text-purple-600">
+                            {isStoreManager
+                              ? data.totalProjectClose
+                              : selectedFinYearData?.projectClose || 0}
+                          </p>
+                        </div>
+                        <div className="px-6 py-4 text-center">
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                            Projects Live
+                          </p>
+                          <p className="text-2xl font-bold mt-1 text-indigo-600">
+                            {isStoreManager
+                              ? data.totalProjects
+                              : selectedFinYearData?.totalProjects || 0}
+                          </p>
+                        </div>
+                        <div className="px-6 py-4 text-center">
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                            Profit Margin
+                          </p>
+                          <p className="text-2xl font-bold mt-1 text-teal-600">
+                            {(selectedFinYearData?.revenue || 0) > 0
+                              ? (
+                                  (((selectedFinYearData?.revenue || 0) -
+                                    (selectedFinYearData?.totalVendorExp ||
+                                      selectedFinYearData?.totalVendorPayments ||
+                                      0) -
+                                    (selectedFinYearData?.totalGST || 0) -
+                                    (selectedFinYearData?.totalExpenses ||
+                                      0)) /
+                                    selectedFinYearData.revenue) *
+                                  100
+                                ).toFixed(1) + "%"
+                              : "—"}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </CardContent>

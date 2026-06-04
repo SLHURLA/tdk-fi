@@ -17,11 +17,31 @@ interface LeadOverviewProps {
   phone: string;
   contactInfo: string;
   store: string;
-  status: "WON" | "LOSS" | "INPROGRESS";
-  createdAt: string; // Used as the base date
+  status: "WON" | "INPROGRESS" | "LOSS" | "CLOSED";
+  createdAt: string;
   updatedAt: string;
   expectedHandover: string;
+  handoverDate?: string | null;
 }
+
+const statusConfig: Record<string, { label: string; className: string }> = {
+  WON: {
+    label: "Won",
+    className: "text-green-700 bg-green-100",
+  },
+  INPROGRESS: {
+    label: "In Progress",
+    className: "text-yellow-700 bg-yellow-100",
+  },
+  CLOSED: {
+    label: "Closed",
+    className: "text-blue-700 bg-blue-100",
+  },
+  LOSS: {
+    label: "Loss",
+    className: "text-red-700 bg-red-100",
+  },
+};
 
 const LeadOverview: React.FC<LeadOverviewProps> = ({
   leadId,
@@ -33,22 +53,28 @@ const LeadOverview: React.FC<LeadOverviewProps> = ({
   status,
   createdAt,
   updatedAt,
+  handoverDate,
 }) => {
-  // Logic to calculate "Won At" (createdAt minus 1 day)
-  const getWonAtDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    // Subtract 1 day (24 hours)
-    date.setDate(date.getDate() - 1);
-
-    // Returns format: DD/MM/YYYY (adjust locale as needed)
-    return date.toLocaleDateString("en-GB");
-  };
   const { toast } = useToast();
-
   const [customerName, setCustomerName] = useState(customer);
   const [isEditing, setIsEditing] = useState(false);
 
+  const getWonAtDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    date.setDate(date.getDate() - 1);
+    return date.toLocaleDateString("en-GB");
+  };
+
   const wonAt = getWonAtDate(createdAt);
+
+  const { label: statusLabel, className: statusClassName } =
+    statusConfig[status] ?? { label: status, className: "text-gray-700 bg-gray-100" };
+
+  const closedDateDisplay =
+    status === "CLOSED" && handoverDate
+      ? new Date(handoverDate).toLocaleDateString("en-GB")
+      : null;
+
   const handleUpdateCustomer = async () => {
     if (!customerName.trim()) {
       toast({
@@ -62,13 +88,8 @@ const LeadOverview: React.FC<LeadOverviewProps> = ({
     try {
       const res = await fetch("/api/updateCustomerName", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          leadId,
-          customerName,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId, customerName }),
       });
 
       const data = await res.json();
@@ -78,10 +99,8 @@ const LeadOverview: React.FC<LeadOverviewProps> = ({
           title: "Success",
           description: "Customer name updated successfully ✅",
         });
-
         setIsEditing(false);
-
-        window.location.reload(); // or mutate()
+        window.location.reload();
       } else {
         toast({
           variant: "destructive",
@@ -89,7 +108,7 @@ const LeadOverview: React.FC<LeadOverviewProps> = ({
           description: data.message,
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         variant: "destructive",
         title: "Error",
@@ -105,16 +124,15 @@ const LeadOverview: React.FC<LeadOverviewProps> = ({
           <Briefcase /> Customer Overview
         </CardTitle>
       </CardHeader>
+
       <CardContent>
         <div className="grid lg:grid-cols-2 grid-cols-1 gap-3 text-sm">
-          {/* Using a cleaner map structure */}
           {[
             { label: "Customer ID", value: displayLeadId },
-            // { label: "Customer", value: customer },
             { label: "Phone", value: phone },
             { label: "Contact Info", value: contactInfo },
             { label: "Store", value: store },
-            { label: "Won At", value: wonAt }, // Displays the calculated date
+            { label: "Won At", value: wonAt },
           ].map(({ label, value }) => (
             <div
               key={label}
@@ -124,9 +142,10 @@ const LeadOverview: React.FC<LeadOverviewProps> = ({
               <p className="text-right">{value}</p>
             </div>
           ))}
+
+          {/* Editable customer name */}
           <div className="p-2 border rounded-md flex items-center justify-between">
             <span className="font-semibold">Customer:</span>
-
             <div className="flex gap-2 items-center">
               {isEditing ? (
                 <>
@@ -136,11 +155,9 @@ const LeadOverview: React.FC<LeadOverviewProps> = ({
                     onChange={(e) => setCustomerName(e.target.value)}
                     className="border px-2 py-1 rounded"
                   />
-
                   <Button size="sm" onClick={handleUpdateCustomer}>
                     Save
                   </Button>
-
                   <Button
                     size="sm"
                     variant="outline"
@@ -155,7 +172,6 @@ const LeadOverview: React.FC<LeadOverviewProps> = ({
               ) : (
                 <>
                   <p className="text-right">{customer}</p>
-
                   <Button size="sm" onClick={() => setIsEditing(true)}>
                     Edit
                   </Button>
@@ -164,23 +180,24 @@ const LeadOverview: React.FC<LeadOverviewProps> = ({
             </div>
           </div>
 
-          {/* Status Field with Dynamic Styling */}
+          {/* Status badge */}
           <div className="p-2 border rounded-md flex items-center justify-between">
             <span className="font-semibold">Status:</span>
-            <p
-              className={`text-right font-bold w-fit py-1 px-4 rounded-md ${
-                status === "WON"
-                  ? "text-green-600 bg-lime-200"
-                  : status === "INPROGRESS"
-                    ? "text-yellow-600 bg-yellow-100"
-                    : "text-red-600 bg-red-200"
-              }`}
-            >
-              {status}
-            </p>
+            <span className={`font-bold py-1 px-4 rounded-md ${statusClassName}`}>
+              {statusLabel}
+            </span>
           </div>
+
+          {/* Closed On — only visible when status is CLOSED and handoverDate exists */}
+          {closedDateDisplay && (
+            <div className="p-2 border rounded-md flex items-center justify-between">
+              <span className="font-semibold">Closed On:</span>
+              <p className="text-right">{closedDateDisplay}</p>
+            </div>
+          )}
         </div>
       </CardContent>
+
       <CardFooter className="text-gray-500 text-sm text-center">
         Last updated: {updatedAt}
       </CardFooter>

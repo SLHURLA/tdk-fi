@@ -294,6 +294,7 @@ const SingleLead = () => {
                 expectedHandover={new Date(
                   data.expectedHandoverDate,
                 ).toLocaleDateString("en-GB")}
+                handoverDate={data.handoverDate}
               />
             </DialogContent>
           </Dialog>
