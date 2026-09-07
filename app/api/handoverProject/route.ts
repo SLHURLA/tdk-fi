@@ -42,8 +42,18 @@ export async function POST(request: NextRequest) {
 
     const newUserId = lead?.userId;
 
+    // if (!lead) {
+    //   return NextResponse.json({ message: "lead not found" }, { status: 401 });
+    // }
     if (!lead) {
       return NextResponse.json({ message: "lead not found" }, { status: 401 });
+    }
+
+    if (lead.status === "CLOSED") {
+      return NextResponse.json(
+        { message: "This lead is already marked as handed over." },
+        { status: 400 },
+      );
     }
 
     const updLead = await db.lead.update({

@@ -1,3 +1,518 @@
+// "use client";
+
+// import * as React from "react";
+// import {
+//   ColumnDef,
+//   ColumnFiltersState,
+//   SortingState,
+//   flexRender,
+//   getCoreRowModel,
+//   getFilteredRowModel,
+//   getPaginationRowModel,
+//   getSortedRowModel,
+//   useReactTable,
+// } from "@tanstack/react-table";
+// import { format } from "date-fns";
+// // ✅ CORRECT (Each icon listed only once)
+// import {
+//   Activity,
+//   CheckCircle2,
+//   Search,
+//   Users,
+//   Sparkles,
+//   CalendarIcon,
+//   Download,
+//   Filter,
+//   Loader2, // If you are using it elsewhere
+// } from "lucide-react";
+
+// import { DateRange } from "react-day-picker";
+// import { cn } from "@/lib/utils";
+// import { usePathname } from "next/navigation";
+// import { Button } from "@/components/ui/button";
+// import { Input } from "@/components/ui/input";
+// import {
+//   Table,
+//   TableBody,
+//   TableCell,
+//   TableHead,
+//   TableHeader,
+//   TableRow,
+// } from "@/components/ui/table";
+// import {
+//   Popover,
+//   PopoverContent,
+//   PopoverTrigger,
+// } from "@/components/ui/popover";
+// import { Calendar } from "@/components/ui/calendar";
+// import {
+//   Select,
+//   SelectContent,
+//   SelectItem,
+//   SelectTrigger,
+//   SelectValue,
+// } from "@/components/ui/select";
+// import { Card, CardContent } from "@/components/ui/card";
+
+// interface DataTableProps<TData, TValue> {
+//   columns: ColumnDef<TData, TValue>[];
+//   data: TData[];
+// }
+
+// // 🎯 Function to get financial year range
+// const getFinancialYearRange = (
+//   financialYear: string,
+// ): DateRange | undefined => {
+//   if (!financialYear || financialYear === "all") return undefined;
+
+//   const [startYear] = financialYear.split("-").map(Number);
+//   const from = new Date(startYear, 3, 1); // April 1
+//   const to = new Date(startYear + 1, 2, 31); // March 31 of next year
+
+//   return { from, to };
+// };
+
+// // 🎯 Function to generate financial years dynamically
+// const generateFinancialYears = (): string[] => {
+//   const currentDate = new Date();
+//   const currentYear = currentDate.getFullYear();
+
+//   // Determine current financial year
+//   const currentFinancialYear =
+//     currentDate.getMonth() >= 3 ? currentYear : currentYear - 1;
+
+//   const years: string[] = [];
+
+//   // Generate from 2025-26 to current year + 10 years
+//   for (let year = 2025; year <= currentFinancialYear; year++) {
+//     years.push(`${year}-${(year + 1).toString().slice(-2)}`);
+//   }
+
+//   return years;
+// };
+
+// export function DataTable<TData, TValue>({
+//   columns,
+//   data,
+// }: DataTableProps<TData, TValue>) {
+//   const [sorting, setSorting] = React.useState<SortingState>([]);
+//   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+//     [],
+//   );
+//   const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+//     from: undefined,
+//     to: undefined,
+//   });
+//   const [isDatePopoverOpen, setIsDatePopoverOpen] = React.useState(false);
+//   const [financialYear, setFinancialYear] = React.useState<string>("all");
+//   const pathname = usePathname();
+//   const [globalFilter, setGlobalFilter] = React.useState<string>("");
+//   const [statusFilter, setStatusFilter] = React.useState<string>(
+//     pathname === "/tsmgowp/leads/processing" ? "INPROGRESS" : "",
+//   );
+
+//   const statuses = React.useMemo(() => {
+//     const uniqueStatuses = new Set<string>();
+//     data.forEach((item: any) => {
+//       if (item.status) uniqueStatuses.add(item.status);
+//     });
+//     return Array.from(uniqueStatuses);
+//   }, [data]);
+
+//   // 🎯 Handle financial year change
+//   const handleFinancialYearChange = (value: string) => {
+//     setFinancialYear(value);
+//     if (value === "all") {
+//       setDateRange({ from: undefined, to: undefined });
+//       setIsDatePopoverOpen(false);
+//     } else {
+//       const range = getFinancialYearRange(value);
+//       setDateRange(range);
+//       setIsDatePopoverOpen(false);
+//     }
+//   };
+
+//   const filteredData = React.useMemo(() => {
+//     let filtered = [...data];
+
+//     // if (dateRange?.from || dateRange?.to) {
+//     //   filtered = filtered.filter((item: any) => {
+//     //     const createdAt = new Date(item.createdAt);
+//     //     const createdAtDateOnly = new Date(createdAt.getFullYear(), createdAt.getMonth(), createdAt.getDate());
+//     //     const fromDate = dateRange.from ? new Date(dateRange.from.getFullYear(), dateRange.from.getMonth(), dateRange.from.getDate()) : new Date(0);
+//     //     const toDate = dateRange.to ? new Date(dateRange.to.getFullYear(), dateRange.to.getMonth(), dateRange.to.getDate()) : new Date(8640000000000000);
+//     //     return createdAtDateOnly >= fromDate && createdAtDateOnly <= toDate;
+//     //   });
+//     // }
+//     if (dateRange?.from || dateRange?.to) {
+//       filtered = filtered.filter((item: any) => {
+//         // CLOSED leads => filter by handoverDate (jab actually handover hua).
+//         // Baaki leads (WON/INPROGRESS) ka handoverDate hota hi nahi, unke liye createdAt hi rahega.
+//         const relevantDateRaw =
+//           item.status === "CLOSED" && item.handoverDate
+//             ? item.handoverDate
+//             : item.createdAt;
+//         const relevantDate = new Date(relevantDateRaw);
+//         const relevantDateOnly = new Date(
+//           relevantDate.getFullYear(),
+//           relevantDate.getMonth(),
+//           relevantDate.getDate(),
+//         );
+//         const fromDate = dateRange.from
+//           ? new Date(
+//               dateRange.from.getFullYear(),
+//               dateRange.from.getMonth(),
+//               dateRange.from.getDate(),
+//             )
+//           : new Date(0);
+//         const toDate = dateRange.to
+//           ? new Date(
+//               dateRange.to.getFullYear(),
+//               dateRange.to.getMonth(),
+//               dateRange.to.getDate(),
+//             )
+//           : new Date(8640000000000000);
+//         return relevantDateOnly >= fromDate && relevantDateOnly <= toDate;
+//       });
+//     }
+
+//     if (globalFilter) {
+//       const searchTerm = globalFilter.toLowerCase();
+//       filtered = filtered.filter((item: any) => {
+//         const leadId = String(item.lead_id).toLowerCase();
+//         const customerName = String(item.customerName).toLowerCase();
+//         return leadId.includes(searchTerm) || customerName.includes(searchTerm);
+//       });
+//     }
+
+//     if (statusFilter && statusFilter !== "status") {
+//       filtered = filtered.filter((item: any) => item.status === statusFilter);
+//     }
+
+//     return filtered;
+//   }, [data, dateRange, globalFilter, statusFilter]);
+
+//   const stats = React.useMemo(() => {
+//     return {
+//       all: filteredData.length,
+//       fresh: filteredData.filter((item: any) => !item.init).length,
+//       live: data.filter(
+//         (item: any) =>
+//           (item.status === "INPROGRESS" || item.status === "WON") &&
+//           item.init === true,
+//       ).length,
+//       // Add this line:
+//       closed: filteredData.filter((item: any) => item.status === "CLOSED")
+//         .length,
+//     };
+//   }, [filteredData]);
+
+//   const table = useReactTable({
+//     data: filteredData,
+//     columns,
+//     onSortingChange: setSorting,
+//     getCoreRowModel: getCoreRowModel(),
+//     getPaginationRowModel: getPaginationRowModel(),
+//     getSortedRowModel: getSortedRowModel(),
+//     onColumnFiltersChange: setColumnFilters,
+//     getFilteredRowModel: getFilteredRowModel(),
+//     state: { sorting, columnFilters },
+//   });
+
+//   const exportToExcel = () => {
+//     if (filteredData.length === 0) return;
+//     try {
+//       const firstItem = filteredData[0];
+//       const allKeys = Object.keys(firstItem || {}).filter(
+//         (key) => key !== "user" && key !== "_count",
+//       );
+//       const escapeCSV = (value: any) => {
+//         if (value === null || value === undefined) return "";
+//         let strValue = String(value);
+//         if (
+//           strValue.includes(",") ||
+//           strValue.includes('"') ||
+//           strValue.includes("\n")
+//         ) {
+//           strValue = strValue.replace(/"/g, '""');
+//           return `"${strValue}"`;
+//         }
+//         return strValue;
+//       };
+//       const headers = [
+//         ...allKeys.filter((key) => key !== "createdAt"),
+//         "Day",
+//         "Month",
+//         "Year",
+//         "Full_Date",
+//       ];
+//       const rows = filteredData.map((row: any) => {
+//         const createdAt = new Date(row.createdAt);
+//         const day = escapeCSV(createdAt.getDate().toString());
+//         const month = escapeCSV(
+//           createdAt.toLocaleString("default", { month: "long" }),
+//         );
+//         const year = escapeCSV(createdAt.getFullYear().toString());
+//         const fullDate = escapeCSV(format(createdAt, "LLL dd, yyyy"));
+//         const rowData = allKeys
+//           .filter((key) => key !== "createdAt")
+//           .map((key) => escapeCSV(row[key]));
+//         return [...rowData, day, month, year, fullDate];
+//       });
+//       const csvContent = [
+//         headers.join(","),
+//         ...rows.map((row) => row.join(",")),
+//       ].join("\n");
+//       const blob = new Blob(["\uFEFF" + csvContent], {
+//         type: "text/csv;charset=utf-8;",
+//       });
+//       const link = document.createElement("a");
+//       link.href = URL.createObjectURL(blob);
+//       link.setAttribute(
+//         "download",
+//         `leads_export_${format(new Date(), "yyyy-MM-dd")}.csv`,
+//       );
+//       link.click();
+//     } catch (e) {
+//       console.error(e);
+//     }
+//   };
+
+//   return (
+//     // Replaced hardcoded black with adaptive background and text
+//     <div className="w-full max-w-none mx-0 px-0 space-y-4 bg-background text-foreground transition-colors pt-0">
+//       {/* --- STATS SECTION --- */}
+//       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+//         <Card className="border-l-4 border-l-muted-foreground shadow-sm">
+//           <CardContent className="flex items-center p-5">
+//             <div className="bg-muted p-3 rounded-full mr-4">
+//               <Users className="h-5 w-5 text-muted-foreground" />
+//             </div>
+//             <div>
+//               <p className="text-xs font-semibold text-muted-foreground uppercase">
+//                 Total Results
+//               </p>
+//               <h3 className="text-2xl font-bold">{stats.all}</h3>
+//             </div>
+//           </CardContent>
+//         </Card>
+
+//         <Card className="border-l-4 border-l-blue-600 shadow-sm">
+//           <CardContent className="flex items-center p-5">
+//             <div className="bg-blue-100 dark:bg-blue-900/20 p-3 rounded-full mr-4">
+//               <Sparkles className="h-5 w-5 text-blue-600" />
+//             </div>
+//             <div>
+//               <p className="text-xs font-semibold text-muted-foreground uppercase">
+//                 Fresh Leads
+//               </p>
+//               <h3 className="text-2xl font-bold text-blue-600">
+//                 {stats.fresh}
+//               </h3>
+//             </div>
+//           </CardContent>
+//         </Card>
+
+//         <Card className="border-l-4 border-l-emerald-600 shadow-sm">
+//           <CardContent className="flex items-center p-5">
+//             <div className="bg-emerald-100 dark:bg-emerald-900/20 p-3 rounded-full mr-4">
+//               <Activity className="h-5 w-5 text-emerald-600" />
+//             </div>
+//             <div>
+//               <p className="text-xs font-semibold text-muted-foreground uppercase">
+//                 Live Leads
+//               </p>
+//               <h3 className="text-2xl font-bold text-emerald-600">
+//                 {stats.live}
+//               </h3>
+//             </div>
+//           </CardContent>
+//         </Card>
+//         {/* --- CLOSED LEADS CARD --- */}
+//         <Card className="border-l-4 border-l-violet-600 shadow-sm">
+//           <CardContent className="flex items-center p-5">
+//             <div className="bg-violet-100 dark:bg-violet-900/20 p-3 rounded-full mr-4">
+//               <CheckCircle2 className="h-5 w-5 text-violet-600" />
+//             </div>
+//             <div>
+//               <p className="text-xs font-semibold text-muted-foreground uppercase">
+//                 Closed Leads
+//               </p>
+//               <h3 className="text-2xl font-bold text-violet-600">
+//                 {stats.closed}
+//               </h3>
+//             </div>
+//           </CardContent>
+//         </Card>
+//       </div>
+
+//       {/* --- FILTERS BAR --- */}
+//       <div className="flex items-center py-4 gap-2 flex-wrap bg-card p-4 rounded-xl border shadow-sm transition-colors">
+//         <Button variant="outline" onClick={exportToExcel} className="shadow-sm">
+//           <Download className="h-4 w-4 mr-2" />
+//         </Button>
+
+//         <div className="relative max-w-xs flex-1">
+//           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+//           <Input
+//             placeholder="Search leads..."
+//             value={globalFilter}
+//             onChange={(e) => setGlobalFilter(e.target.value)}
+//             className="pl-10"
+//           />
+//         </div>
+
+//         {/* 🎯 FINANCIAL YEAR FILTER */}
+//         <Select value={financialYear} onValueChange={handleFinancialYearChange}>
+//           <SelectTrigger className="w-[180px]">
+//             <div className="flex items-center">
+//               <CalendarIcon className="h-4 w-4 mr-2" />
+//               <SelectValue placeholder="Financial Year" />
+//             </div>
+//           </SelectTrigger>
+//           <SelectContent>
+//             <SelectItem value="all">All Years</SelectItem>
+//             {generateFinancialYears().map((year) => (
+//               <SelectItem key={year} value={year}>
+//                 {year}
+//               </SelectItem>
+//             ))}
+//           </SelectContent>
+//         </Select>
+
+//         <Select
+//           value={statusFilter || "status"}
+//           onValueChange={(v) => setStatusFilter(v === "status" ? "" : v)}
+//         >
+//           <SelectTrigger className="w-[180px]">
+//             <div className="flex items-center">
+//               <Filter className="h-4 w-4 mr-2" />
+//               <SelectValue placeholder="Status" />
+//             </div>
+//           </SelectTrigger>
+//           <SelectContent>
+//             <SelectItem value="status">All Statuses</SelectItem>
+//             {statuses.map((s) => (
+//               <SelectItem key={s} value={s}>
+//                 {s}
+//               </SelectItem>
+//             ))}
+//           </SelectContent>
+//         </Select>
+
+//         <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}>
+//           <PopoverTrigger asChild>
+//             <Button
+//               variant="outline"
+//               className={cn(
+//                 "w-[280px] justify-start text-left font-normal shadow-sm",
+//                 !dateRange && "text-muted-foreground",
+//               )}
+//             >
+//               <CalendarIcon className="mr-2 h-4 w-4" />
+//               {dateRange?.from
+//                 ? dateRange.to
+//                   ? `${format(dateRange.from, "PP")} - ${format(dateRange.to, "PP")}`
+//                   : format(dateRange.from, "PP")
+//                 : "Filter by date"}
+//             </Button>
+//           </PopoverTrigger>
+//           <PopoverContent className="w-auto p-0" align="start">
+//             <Calendar
+//               mode="range"
+//               selected={dateRange}
+//               onSelect={(r) => {
+//                 setDateRange(r);
+//                 if (r?.from && r?.to) setIsDatePopoverOpen(false);
+//               }}
+//               numberOfMonths={2}
+//             />
+//           </PopoverContent>
+//         </Popover>
+//       </div>
+
+//       {/* --- DATA TABLE SECTION --- */}
+//       <div className="rounded-xl border bg-card shadow-sm overflow-hidden transition-colors">
+//         <Table>
+//           <TableHeader className="bg-muted/50">
+//             {table.getHeaderGroups().map((headerGroup) => (
+//               <TableRow key={headerGroup.id}>
+//                 {headerGroup.headers.map((header) => (
+//                   <TableHead key={header.id} className="font-bold">
+//                     {header.isPlaceholder
+//                       ? null
+//                       : flexRender(
+//                           header.column.columnDef.header,
+//                           header.getContext(),
+//                         )}
+//                   </TableHead>
+//                 ))}
+//               </TableRow>
+//             ))}
+//           </TableHeader>
+//           <TableBody>
+//             {table.getRowModel().rows.length ? (
+//               table.getRowModel().rows.map((row) => (
+//                 <TableRow
+//                   key={row.id}
+//                   className="hover:bg-muted/50 transition-colors"
+//                 >
+//                   {row.getVisibleCells().map((cell) => (
+//                     <TableCell key={cell.id} className="p-4">
+//                       {flexRender(
+//                         cell.column.columnDef.cell,
+//                         cell.getContext(),
+//                       )}
+//                     </TableCell>
+//                   ))}
+//                 </TableRow>
+//               ))
+//             ) : (
+//               <TableRow>
+//                 <TableCell
+//                   colSpan={columns.length}
+//                   className="h-32 text-center text-muted-foreground"
+//                 >
+//                   No data found for the selected filters.
+//                 </TableCell>
+//               </TableRow>
+//             )}
+//           </TableBody>
+//         </Table>
+//       </div>
+
+//       {/* --- PAGINATION SECTION --- */}
+//       <div className="flex items-center justify-between py-2 px-2">
+//         <div className="text-sm text-muted-foreground">
+//           Showing{" "}
+//           <span className="font-medium text-foreground">
+//             {table.getRowModel().rows.length}
+//           </span>{" "}
+//           results
+//         </div>
+//         <div className="flex gap-2">
+//           <Button
+//             variant="outline"
+//             size="sm"
+//             onClick={() => table.previousPage()}
+//             disabled={!table.getCanPreviousPage()}
+//           >
+//             Previous
+//           </Button>
+//           <Button
+//             variant="outline"
+//             size="sm"
+//             onClick={() => table.nextPage()}
+//             disabled={!table.getCanNextPage()}
+//           >
+//             Next
+//           </Button>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+
 "use client";
 
 import * as React from "react";
@@ -14,16 +529,17 @@ import {
 } from "@tanstack/react-table";
 import { format } from "date-fns";
 // ✅ CORRECT (Each icon listed only once)
-import { 
+import {
   Activity,
-  CheckCircle2, 
-  Search, 
-  Users, 
+  CheckCircle2,
+  Search,
+  Users,
   Sparkles,
-  CalendarIcon, 
-  Download, 
+  CalendarIcon,
+  Download,
   Filter,
-  Loader2 // If you are using it elsewhere
+  Loader2, // If you are using it elsewhere
+  ChevronDown,
 } from "lucide-react";
 
 import { DateRange } from "react-day-picker";
@@ -52,6 +568,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface DataTableProps<TData, TValue> {
@@ -60,13 +582,15 @@ interface DataTableProps<TData, TValue> {
 }
 
 // 🎯 Function to get financial year range
-const getFinancialYearRange = (financialYear: string): DateRange | undefined => {
+const getFinancialYearRange = (
+  financialYear: string,
+): DateRange | undefined => {
   if (!financialYear || financialYear === "all") return undefined;
-  
+
   const [startYear] = financialYear.split("-").map(Number);
   const from = new Date(startYear, 3, 1); // April 1
   const to = new Date(startYear + 1, 2, 31); // March 31 of next year
-  
+
   return { from, to };
 };
 
@@ -74,36 +598,86 @@ const getFinancialYearRange = (financialYear: string): DateRange | undefined => 
 const generateFinancialYears = (): string[] => {
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
-  
+
   // Determine current financial year
-  const currentFinancialYear = currentDate.getMonth() >= 3 ? currentYear : currentYear - 1;
-  
+  const currentFinancialYear =
+    currentDate.getMonth() >= 3 ? currentYear : currentYear - 1;
+
   const years: string[] = [];
-  
+
   // Generate from 2025-26 to current year + 10 years
-  for (let year = 2025; year <= currentFinancialYear ; year++) {
+  for (let year = 2025; year <= currentFinancialYear; year++) {
     years.push(`${year}-${(year + 1).toString().slice(-2)}`);
   }
-  
+
   return years;
 };
+
+// 🎯 Calendar-month / quarter / calendar-year range helpers.
+// Quarter convention matches the dashboard: quarter = Math.ceil(month / 3),
+// i.e. Jan-Mar = Q1, Apr-Jun = Q2, Jul-Sep = Q3, Oct-Dec = Q4.
+const getMonthRange = (year: string, month: string): DateRange => {
+  const y = Number(year);
+  const m = Number(month) - 1; // 0-indexed
+  return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0) };
+};
+
+const getQuarterRange = (year: string, quarter: string): DateRange => {
+  const y = Number(year);
+  const startMonth = (Number(quarter) - 1) * 3;
+  return { from: new Date(y, startMonth, 1), to: new Date(y, startMonth + 3, 0) };
+};
+
+const getYearRange = (year: string): DateRange => {
+  const y = Number(year);
+  return { from: new Date(y, 0, 1), to: new Date(y, 11, 31) };
+};
+
+const getAvailableYears = (): string[] => {
+  const currentYear = new Date().getFullYear();
+  const years: string[] = [];
+  for (let y = 2025; y <= currentYear + 1; y++) years.push(y.toString());
+  return years;
+};
+
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
+  value: (i + 1).toString(),
+  label: new Date(2023, i).toLocaleString("default", { month: "long" }),
+}));
+
+type ViewMode = "financial" | "monthly" | "quarterly" | "yearly";
 
 export function DataTable<TData, TValue>({
   columns,
   data,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    [],
+  );
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
     from: undefined,
     to: undefined,
   });
   const [isDatePopoverOpen, setIsDatePopoverOpen] = React.useState(false);
   const [financialYear, setFinancialYear] = React.useState<string>("all");
+
+  // 🎯 View-mode + period state (mirrors the dashboard's selector)
+  const [viewMode, setViewMode] = React.useState<ViewMode>("financial");
+  const [selectedYear, setSelectedYear] = React.useState<string>(
+    new Date().getFullYear().toString(),
+  );
+  const [selectedMonth, setSelectedMonth] = React.useState<string>(
+    (new Date().getMonth() + 1).toString(),
+  );
+  const [selectedQuarter, setSelectedQuarter] = React.useState<string>(
+    Math.ceil((new Date().getMonth() + 1) / 3).toString(),
+  );
+
   const pathname = usePathname();
   const [globalFilter, setGlobalFilter] = React.useState<string>("");
   const [statusFilter, setStatusFilter] = React.useState<string>(
-    pathname === "/tsmgowp/leads/processing" ? "INPROGRESS" : ""
+    pathname === "/tsmgowp/leads/processing" ? "INPROGRESS" : "",
   );
 
   const statuses = React.useMemo(() => {
@@ -127,16 +701,69 @@ export function DataTable<TData, TValue>({
     }
   };
 
+  // 🎯 Handlers for the other three modes — all just compute a dateRange
+  // and hand it to the same filtering logic below.
+  const applyMonthly = (year: string, month: string) => {
+    setSelectedYear(year);
+    setSelectedMonth(month);
+    setDateRange(getMonthRange(year, month));
+    setIsDatePopoverOpen(false);
+  };
+
+  const applyQuarterly = (year: string, quarter: string) => {
+    setSelectedYear(year);
+    setSelectedQuarter(quarter);
+    setDateRange(getQuarterRange(year, quarter));
+    setIsDatePopoverOpen(false);
+  };
+
+  const applyYearly = (year: string) => {
+    setSelectedYear(year);
+    setDateRange(getYearRange(year));
+    setIsDatePopoverOpen(false);
+  };
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    if (mode === "monthly") applyMonthly(selectedYear, selectedMonth);
+    else if (mode === "quarterly") applyQuarterly(selectedYear, selectedQuarter);
+    else if (mode === "yearly") applyYearly(selectedYear);
+    else if (financialYear !== "all") setDateRange(getFinancialYearRange(financialYear));
+    else setDateRange({ from: undefined, to: undefined });
+  };
+
   const filteredData = React.useMemo(() => {
     let filtered = [...data];
 
     if (dateRange?.from || dateRange?.to) {
       filtered = filtered.filter((item: any) => {
-        const createdAt = new Date(item.createdAt);
-        const createdAtDateOnly = new Date(createdAt.getFullYear(), createdAt.getMonth(), createdAt.getDate());
-        const fromDate = dateRange.from ? new Date(dateRange.from.getFullYear(), dateRange.from.getMonth(), dateRange.from.getDate()) : new Date(0);
-        const toDate = dateRange.to ? new Date(dateRange.to.getFullYear(), dateRange.to.getMonth(), dateRange.to.getDate()) : new Date(8640000000000000);
-        return createdAtDateOnly >= fromDate && createdAtDateOnly <= toDate;
+        // CLOSED leads => filter by handoverDate (jab actually handover hua).
+        // Baaki leads (WON/INPROGRESS) ka handoverDate hota hi nahi, unke liye createdAt hi rahega.
+        const relevantDateRaw =
+          item.status === "CLOSED" && item.handoverDate
+            ? item.handoverDate
+            : item.createdAt;
+        const relevantDate = new Date(relevantDateRaw);
+        const relevantDateOnly = new Date(
+          relevantDate.getFullYear(),
+          relevantDate.getMonth(),
+          relevantDate.getDate(),
+        );
+        const fromDate = dateRange.from
+          ? new Date(
+              dateRange.from.getFullYear(),
+              dateRange.from.getMonth(),
+              dateRange.from.getDate(),
+            )
+          : new Date(0);
+        const toDate = dateRange.to
+          ? new Date(
+              dateRange.to.getFullYear(),
+              dateRange.to.getMonth(),
+              dateRange.to.getDate(),
+            )
+          : new Date(8640000000000000);
+        return relevantDateOnly >= fromDate && relevantDateOnly <= toDate;
       });
     }
 
@@ -160,11 +787,14 @@ export function DataTable<TData, TValue>({
     return {
       all: filteredData.length,
       fresh: filteredData.filter((item: any) => !item.init).length,
-      live: data.filter((item: any) => 
-      (item.status === "INPROGRESS" || item.status === "WON") && item.init === true
-    ).length,
+      live: data.filter(
+        (item: any) =>
+          (item.status === "INPROGRESS" || item.status === "WON") &&
+          item.init === true,
+      ).length,
       // Add this line:
-    closed: filteredData.filter((item: any) => item.status === "CLOSED").length,
+      closed: filteredData.filter((item: any) => item.status === "CLOSED")
+        .length,
     };
   }, [filteredData]);
 
@@ -184,39 +814,64 @@ export function DataTable<TData, TValue>({
     if (filteredData.length === 0) return;
     try {
       const firstItem = filteredData[0];
-      const allKeys = Object.keys(firstItem || {}).filter((key) => key !== "user" && key !== "_count");
+      const allKeys = Object.keys(firstItem || {}).filter(
+        (key) => key !== "user" && key !== "_count",
+      );
       const escapeCSV = (value: any) => {
         if (value === null || value === undefined) return "";
         let strValue = String(value);
-        if (strValue.includes(",") || strValue.includes('"') || strValue.includes("\n")) {
+        if (
+          strValue.includes(",") ||
+          strValue.includes('"') ||
+          strValue.includes("\n")
+        ) {
           strValue = strValue.replace(/"/g, '""');
           return `"${strValue}"`;
         }
         return strValue;
       };
-      const headers = [...allKeys.filter((key) => key !== "createdAt"), "Day", "Month", "Year", "Full_Date"];
+      const headers = [
+        ...allKeys.filter((key) => key !== "createdAt"),
+        "Day",
+        "Month",
+        "Year",
+        "Full_Date",
+      ];
       const rows = filteredData.map((row: any) => {
         const createdAt = new Date(row.createdAt);
         const day = escapeCSV(createdAt.getDate().toString());
-        const month = escapeCSV(createdAt.toLocaleString("default", { month: "long" }));
+        const month = escapeCSV(
+          createdAt.toLocaleString("default", { month: "long" }),
+        );
         const year = escapeCSV(createdAt.getFullYear().toString());
         const fullDate = escapeCSV(format(createdAt, "LLL dd, yyyy"));
-        const rowData = allKeys.filter((key) => key !== "createdAt").map((key) => escapeCSV(row[key]));
+        const rowData = allKeys
+          .filter((key) => key !== "createdAt")
+          .map((key) => escapeCSV(row[key]));
         return [...rowData, day, month, year, fullDate];
       });
-      const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
-      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+      const csvContent = [
+        headers.join(","),
+        ...rows.map((row) => row.join(",")),
+      ].join("\n");
+      const blob = new Blob(["\uFEFF" + csvContent], {
+        type: "text/csv;charset=utf-8;",
+      });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.setAttribute("download", `leads_export_${format(new Date(), "yyyy-MM-dd")}.csv`);
+      link.setAttribute(
+        "download",
+        `leads_export_${format(new Date(), "yyyy-MM-dd")}.csv`,
+      );
       link.click();
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
     // Replaced hardcoded black with adaptive background and text
     <div className="w-full max-w-none mx-0 px-0 space-y-4 bg-background text-foreground transition-colors pt-0">
-      
       {/* --- STATS SECTION --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-l-4 border-l-muted-foreground shadow-sm">
@@ -225,7 +880,9 @@ export function DataTable<TData, TValue>({
               <Users className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase">Total Results</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase">
+                Total Results
+              </p>
               <h3 className="text-2xl font-bold">{stats.all}</h3>
             </div>
           </CardContent>
@@ -237,8 +894,12 @@ export function DataTable<TData, TValue>({
               <Sparkles className="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase">Fresh Leads</p>
-              <h3 className="text-2xl font-bold text-blue-600">{stats.fresh}</h3>
+              <p className="text-xs font-semibold text-muted-foreground uppercase">
+                Fresh Leads
+              </p>
+              <h3 className="text-2xl font-bold text-blue-600">
+                {stats.fresh}
+              </h3>
             </div>
           </CardContent>
         </Card>
@@ -249,33 +910,37 @@ export function DataTable<TData, TValue>({
               <Activity className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase">Live Leads</p>
-              <h3 className="text-2xl font-bold text-emerald-600">{stats.live}</h3>
+              <p className="text-xs font-semibold text-muted-foreground uppercase">
+                Live Leads
+              </p>
+              <h3 className="text-2xl font-bold text-emerald-600">
+                {stats.live}
+              </h3>
             </div>
           </CardContent>
         </Card>
         {/* --- CLOSED LEADS CARD --- */}
-<Card className="border-l-4 border-l-violet-600 shadow-sm">
-  <CardContent className="flex items-center p-5">
-    <div className="bg-violet-100 dark:bg-violet-900/20 p-3 rounded-full mr-4">
-      <CheckCircle2 className="h-5 w-5 text-violet-600" />
-    </div>
-    <div>
-      <p className="text-xs font-semibold text-muted-foreground uppercase">Closed Leads</p>
-      <h3 className="text-2xl font-bold text-violet-600">{stats.closed}</h3>
-    </div>
-  </CardContent>
-</Card>
+        <Card className="border-l-4 border-l-violet-600 shadow-sm">
+          <CardContent className="flex items-center p-5">
+            <div className="bg-violet-100 dark:bg-violet-900/20 p-3 rounded-full mr-4">
+              <CheckCircle2 className="h-5 w-5 text-violet-600" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase">
+                Closed Leads
+              </p>
+              <h3 className="text-2xl font-bold text-violet-600">
+                {stats.closed}
+              </h3>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* --- FILTERS BAR --- */}
       <div className="flex items-center py-4 gap-2 flex-wrap bg-card p-4 rounded-xl border shadow-sm transition-colors">
-        <Button 
-          variant="outline" 
-          onClick={exportToExcel} 
-          className="shadow-sm"
-        >
-          <Download className="h-4 w-4 mr-2" /> 
+        <Button variant="outline" onClick={exportToExcel} className="shadow-sm">
+          <Download className="h-4 w-4 mr-2" />
         </Button>
 
         <div className="relative max-w-xs flex-1">
@@ -288,23 +953,143 @@ export function DataTable<TData, TValue>({
           />
         </div>
 
-        {/* 🎯 FINANCIAL YEAR FILTER */}
-        <Select value={financialYear} onValueChange={handleFinancialYearChange}>
-          <SelectTrigger className="w-[180px]">
-            <div className="flex items-center">
-              <CalendarIcon className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Financial Year" />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Years</SelectItem>
-            {generateFinancialYears().map((year) => (
-              <SelectItem key={year} value={year}>{year}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* 🎯 VIEW MODE PICKER (mirrors the dashboard's selector) */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2 shadow-sm">
+              <CalendarIcon className="h-4 w-4" />
+              {viewMode === "monthly"
+                ? "Monthly Overview"
+                : viewMode === "quarterly"
+                ? "Quarterly Overview"
+                : viewMode === "yearly"
+                ? "Yearly Overview"
+                : "Financial Year Overview"}
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={() => handleViewModeChange("monthly")}>
+              Monthly Overview
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleViewModeChange("quarterly")}>
+              Quarterly Overview
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleViewModeChange("yearly")}>
+              Yearly Overview
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleViewModeChange("financial")}>
+              Financial Year Overview
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        <Select value={statusFilter || "status"} onValueChange={(v) => setStatusFilter(v === "status" ? "" : v)}>
+        {/* 🎯 Sub-selectors — only the one matching the active mode renders */}
+        {viewMode === "financial" && (
+          <Select value={financialYear} onValueChange={handleFinancialYearChange}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Financial Year" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Years</SelectItem>
+              {generateFinancialYears().map((year) => (
+                <SelectItem key={year} value={year}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {viewMode === "yearly" && (
+          <Select value={selectedYear} onValueChange={applyYearly}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent>
+              {getAvailableYears().map((year) => (
+                <SelectItem key={year} value={year}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {viewMode === "quarterly" && (
+          <>
+            <Select
+              value={selectedYear}
+              onValueChange={(y) => applyQuarterly(y, selectedQuarter)}
+            >
+              <SelectTrigger className="w-[110px]">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {getAvailableYears().map((year) => (
+                  <SelectItem key={year} value={year}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={selectedQuarter}
+              onValueChange={(q) => applyQuarterly(selectedYear, q)}
+            >
+              <SelectTrigger className="w-[110px]">
+                <SelectValue placeholder="Quarter" />
+              </SelectTrigger>
+              <SelectContent>
+                {["1", "2", "3", "4"].map((q) => (
+                  <SelectItem key={q} value={q}>
+                    Q{q}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
+
+        {viewMode === "monthly" && (
+          <>
+            <Select
+              value={selectedYear}
+              onValueChange={(y) => applyMonthly(y, selectedMonth)}
+            >
+              <SelectTrigger className="w-[110px]">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {getAvailableYears().map((year) => (
+                  <SelectItem key={year} value={year}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={selectedMonth}
+              onValueChange={(m) => applyMonthly(selectedYear, m)}
+            >
+              <SelectTrigger className="w-[130px]">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTH_OPTIONS.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
+
+        <Select
+          value={statusFilter || "status"}
+          onValueChange={(v) => setStatusFilter(v === "status" ? "" : v)}
+        >
           <SelectTrigger className="w-[180px]">
             <div className="flex items-center">
               <Filter className="h-4 w-4 mr-2" />
@@ -314,32 +1099,40 @@ export function DataTable<TData, TValue>({
           <SelectContent>
             <SelectItem value="status">All Statuses</SelectItem>
             {statuses.map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
+        {/* 🎯 OPTIONAL custom date-range override — independent of the mode picker above */}
         <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}>
           <PopoverTrigger asChild>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className={cn(
                 "w-[280px] justify-start text-left font-normal shadow-sm",
-                !dateRange && "text-muted-foreground"
+                !dateRange && "text-muted-foreground",
               )}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {dateRange?.from ? (
-                dateRange.to ? `${format(dateRange.from, "PP")} - ${format(dateRange.to, "PP")}` : format(dateRange.from, "PP")
-              ) : "Filter by date"}
+              {dateRange?.from
+                ? dateRange.to
+                  ? `${format(dateRange.from, "PP")} - ${format(dateRange.to, "PP")}`
+                  : format(dateRange.from, "PP")
+                : "Filter by date (optional)"}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
-            <Calendar 
-              mode="range" 
-              selected={dateRange} 
-              onSelect={(r) => { setDateRange(r); if (r?.from && r?.to) setIsDatePopoverOpen(false); }} 
-              numberOfMonths={2} 
+            <Calendar
+              mode="range"
+              selected={dateRange}
+              onSelect={(r) => {
+                setDateRange(r);
+                if (r?.from && r?.to) setIsDatePopoverOpen(false);
+              }}
+              numberOfMonths={2}
             />
           </PopoverContent>
         </Popover>
@@ -353,7 +1146,12 @@ export function DataTable<TData, TValue>({
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id} className="font-bold">
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
                   </TableHead>
                 ))}
               </TableRow>
@@ -362,20 +1160,26 @@ export function DataTable<TData, TValue>({
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow 
-                  key={row.id} 
+                <TableRow
+                  key={row.id}
                   className="hover:bg-muted/50 transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="p-4">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-32 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-32 text-center text-muted-foreground"
+                >
                   No data found for the selected filters.
                 </TableCell>
               </TableRow>
@@ -387,21 +1191,25 @@ export function DataTable<TData, TValue>({
       {/* --- PAGINATION SECTION --- */}
       <div className="flex items-center justify-between py-2 px-2">
         <div className="text-sm text-muted-foreground">
-          Showing <span className="font-medium text-foreground">{table.getRowModel().rows.length}</span> results
+          Showing{" "}
+          <span className="font-medium text-foreground">
+            {table.getRowModel().rows.length}
+          </span>{" "}
+          results
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => table.previousPage()} 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
           >
             Previous
           </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => table.nextPage()} 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
           >
             Next
